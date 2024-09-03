@@ -35,7 +35,7 @@ def search_multiple_page(
                 results = search_results.json()
                 search_cache[cache_key] = results
 
-        if "organic" in results:
+        if "organic" in results and results["organic"]:
             all_results.extend(results["organic"])
         else:
             break
