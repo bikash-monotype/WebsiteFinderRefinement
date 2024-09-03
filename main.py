@@ -16,13 +16,14 @@ from copyright import get_copyright
 load_dotenv()
 
 default_llm = AzureChatOpenAI(
-    azure_endpoint=os.getenv('AZURE_OPENAI_ENDPOINT'),
-    model=os.getenv('AZURE_OPENAI_DEPLOYMENT_NAME'),
-    openai_api_version=os.getenv('OPENAI_API_VERSION'),
-    temperature=0
+    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+    model=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME"),
+    openai_api_version=os.getenv("OPENAI_API_VERSION"),
+    temperature=0,
 )
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
+
 
 def extract_domain_name(url):
     parsed_url = urllib.parse.urlparse(url)
@@ -31,6 +32,7 @@ def extract_domain_name(url):
 
     return domain_name
 
+
 def extract_main_part(url):
     parsed_url = urllib.parse.urlparse(url)
     extracted = tldextract.extract(parsed_url.netloc)
@@ -38,14 +40,24 @@ def extract_main_part(url):
 
     return domain_name
 
-def read_chunks_from_file(input_file):
-  data_file_path = os.path.join(script_dir, "data", input_file)
 
-  df = pd.read_excel(data_file_path, header=None)
-  df = df.applymap(lambda x: str(x).replace(",", ""))
-  data_string = ", ".join(df.values.flatten())
-  entries_list = data_string.split(", ")
-  return entries_list
+def read_chunks_from_file(input_file):
+    data_file_path = os.path.join(
+        script_dir, "data", "subsidiaryfinding-Iteration", input_file
+    )
+
+    df = pd.read_excel(data_file_path, header=None, index_col=None)
+
+    # combine the two columns into one df
+    df = pd.concat([df[2], df[3]], axis=0)
+    df = df.dropna()
+    df = df.drop_duplicates()
+
+    # df = df.applymap(lambda x: str(x).replace(",", ""))
+    data_string = ", ".join(df.values.flatten())
+    entries_list = data_string.split(", ")
+    return entries_list
+
 
 def create_result_directory(output_folder):
     script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -54,14 +66,17 @@ def create_result_directory(output_folder):
     os.makedirs(new_folder_path, exist_ok=True)
     set_log_file(os.path.join(new_folder_path, "log.txt"))
 
+
 def set_log_file(file_path):
-    with open(file_path, 'w') as f:
-        f.write('')
+    with open(file_path, "w") as f:
+        f.write("")
 
     config.log_file = file_path
 
+
 def get_log_file():
     return config.log_file
+
 
 def main():
     companies = [
@@ -71,9 +86,9 @@ def main():
         #     'output_folder': 'TuroInc'
         # },
         {
-            'file': 'hiltonworldwide.xlsx',
-            'main_company': 'Hilton Worldwide Holdings, Inc.',
-            'output_folder': 'HiltonWorldwideHoldings'
+            "file": "Dapper Labs, Inc..xlsx",
+            "main_company": "Dapper Labs, Inc.",
+            "output_folder": "Dapper Labs, Inc.",
         },
     ]
 
@@ -82,7 +97,7 @@ def main():
         goal="Accurately identify the main website of the company {company_name} , which is a part of {main_company}.",
         verbose=True,
         llm=default_llm,
-        model_name='gpt-4o',
+        model_name="gpt-4o",
         allow_delegation=False,
         backstory="""
             You have been a part of {main_company} for many years and have a deep understanding of the company's operations and online presence.
@@ -94,33 +109,43 @@ def main():
     )
 
     sample_expert_website_researcher_output = {
-        'subdisiary_name1': [
-            'https://www.subdisiary_name1.com',
-            'https://www.subdisiary_name1.org'
+        "subdisiary_name1": [
+            "https://www.subdisiary_name1.com",
+            "https://www.subdisiary_name1.org",
         ]
     }
 
-    sample_expert_website_researcher_output = json.dumps(sample_expert_website_researcher_output)
+    sample_expert_website_researcher_output = json.dumps(
+        sample_expert_website_researcher_output
+    )
 
     for company in companies:
-        input_file = company['file']
-        main_company = company['main_company']
-        output_folder = company['output_folder']
+        input_file = company["file"]
+        main_company = company["main_company"]
+        output_folder = company["output_folder"]
 
         final_results = []
 
         file_company_list = read_chunks_from_file(input_file)
-        print(file_company_list)
         create_result_directory(output_folder)
+
+        print("Starting the process")
+        print("File company list: ", file_company_list)
 
         official_websites = set()
 
         for subsidiary in file_company_list:
-            search_results1 = search_multiple_page(f"{subsidiary} a part of {main_company} official website", 10, 1)
-            search_results2 = search_multiple_page(f"{subsidiary} official website", 10, 1)
+            search_results1 = search_multiple_page(
+                f"{subsidiary} a part of {main_company} official website", 10, 1
+            )
+            search_results2 = search_multiple_page(
+                f"{subsidiary} official website", 10, 1
+            )
             search_results3 = search_multiple_page(f"{subsidiary}", 10, 1)
 
-            search_results = json.dumps(search_results1 + search_results2 + search_results3)
+            search_results = json.dumps(
+                search_results1 + search_results2 + search_results3
+            )
 
             expert_website_researcher_task_1 = Task(
                 description=(
@@ -154,12 +179,19 @@ def main():
                 agents=[expert_website_researcher_agent_1],
                 tasks=[expert_website_researcher_task_1],
                 process=Process.sequential,
-                verbose=1
+                verbose=1,
             )
 
-            results = expert_website_researcher_crew_1.kickoff(inputs={"company_name": subsidiary, "main_company": main_company, "search_results": search_results, "sample_expert_website_researcher_output": sample_expert_website_researcher_output})
+            results = expert_website_researcher_crew_1.kickoff(
+                inputs={
+                    "company_name": subsidiary,
+                    "main_company": main_company,
+                    "search_results": search_results,
+                    "sample_expert_website_researcher_output": sample_expert_website_researcher_output,
+                }
+            )
             results = json_repair.loads(results.raw)
-            
+
             final_results.append(results)
 
         data = []
@@ -174,62 +206,89 @@ def main():
                         if domain_name not in official_websites:
                             official_websites.add(domain_name)
                             full_domain = f"{scheme}://{domain_name}"
-                            data.append({'Company Name': company, 'Website URL': full_domain})
+                            data.append(
+                                {"Company Name": company, "Website URL": full_domain}
+                            )
             else:
-                with open(get_log_file(), 'a') as f:
+                with open(get_log_file(), "a") as f:
                     f.write(f"Skipping non-dict result: {result}")
                 print(f"Skipping non-dict result: {result}")
 
-        df = pd.DataFrame(data, columns=['Company Name', 'Website URL'])
+        df = pd.DataFrame(data, columns=["Company Name", "Website URL"])
 
-        df.to_excel('./final_results/' + output_folder + '/website_research_agent' + '.xlsx', engine='openpyxl', index=False)
+        df.to_excel(
+            "./final_results/" + output_folder + "/website_research_agent" + ".xlsx",
+            engine="openpyxl",
+            index=False,
+        )
 
         print("Data exported")
 
-        df = pd.read_excel('./final_results/' + output_folder + '/website_research_agent' + '.xlsx', engine='openpyxl')
+        df = pd.read_excel(
+            "./final_results/" + output_folder + "/website_research_agent" + ".xlsx",
+            engine="openpyxl",
+        )
 
         website_results = set()
 
-        website_urls = df['Website URL'].tolist()
+        website_urls = df["Website URL"].tolist()
         copyrights = []
 
         for website in website_urls:
             website_results.add(extract_domain_name(website))
             copyright = get_copyright(website)
-            copyrights.append(copyright['copyright'])
+            copyrights.append(copyright["copyright"])
 
-        df['Copyright'] = copyrights
+        df["Copyright"] = copyrights
 
-        df.to_excel('./final_results/' + output_folder + '/website_research_agent' + '.xlsx', engine='openpyxl', index=False)
+        df.to_excel(
+            "./final_results/" + output_folder + "/website_research_agent" + ".xlsx",
+            engine="openpyxl",
+            index=False,
+        )
 
-        df = pd.read_excel('./final_results/' + output_folder + '/website_research_agent' + '.xlsx', engine='openpyxl')
+        df = pd.read_excel(
+            "./final_results/" + output_folder + "/website_research_agent" + ".xlsx",
+            engine="openpyxl",
+        )
 
-        copyrights = df['Copyright'].tolist()
+        copyrights = df["Copyright"].tolist()
         copyrights = set(copyrights)
 
         copyright_results = set()
 
         for copyright in list(copyrights):
-            copyright_result = search_multiple_page(f'"{copyright}" -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -news -blog -articles -forums -pdf -sec.gov -x.com -amazon -vimeo', 100, 3)
+            copyright_result = search_multiple_page(
+                f'"{copyright}" -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -news -blog -articles -forums -pdf -sec.gov -x.com -amazon -vimeo',
+                100,
+                3,
+            )
 
             for result in copyright_result:
                 try:
-                    copyright_results.add(extract_domain_name(result['link']))
+                    copyright_results.add(extract_domain_name(result["link"]))
 
                     if "sitelinks" in result:
-                        copyright_results.add(extract_domain_name(result['link']))
+                        copyright_results.add(extract_domain_name(result["link"]))
                 except KeyError:
                     continue
 
-        df = pd.DataFrame(copyright_results, columns=['Website URL'])
+        df = pd.DataFrame(copyright_results, columns=["Website URL"])
 
-        df = df.to_excel('./final_results/' + output_folder + '/copyright_research_agent' + '.xlsx', engine='openpyxl', index=False)
+        df = df.to_excel(
+            "./final_results/" + output_folder + "/copyright_research_agent" + ".xlsx",
+            engine="openpyxl",
+            index=False,
+        )
 
         print(copyright_results)
 
-        df = pd.read_excel('./final_results/' + output_folder + '/website_research_agent' + '.xlsx', engine='openpyxl')
+        df = pd.read_excel(
+            "./final_results/" + output_folder + "/website_research_agent" + ".xlsx",
+            engine="openpyxl",
+        )
 
-        website_urls = df['Website URL'].tolist()
+        website_urls = df["Website URL"].tolist()
 
         website_urls = set(website_urls)
 
@@ -247,26 +306,37 @@ def main():
 
             for result in search_results:
                 try:
-                    domain_search_results.add(extract_domain_name(result['link']))
+                    domain_search_results.add(extract_domain_name(result["link"]))
 
                     if "sitelinks" in result:
-                        domain_search_results.add(extract_domain_name(result['link']))
+                        domain_search_results.add(extract_domain_name(result["link"]))
                 except KeyError:
                     continue
 
-        df = pd.DataFrame(domain_search_results, columns=['Website URL'])
+        df = pd.DataFrame(domain_search_results, columns=["Website URL"])
 
-        df = df.to_excel('./final_results/' + output_folder + '/domain_search_agent' + '.xlsx', engine='openpyxl', index=False)
+        df = df.to_excel(
+            "./final_results/" + output_folder + "/domain_search_agent" + ".xlsx",
+            engine="openpyxl",
+            index=False,
+        )
 
         print(domain_search_results)
 
-        combined_final_results = website_results.union(copyright_results).union(domain_search_results)
+        combined_final_results = website_results.union(copyright_results).union(
+            domain_search_results
+        )
 
-        df = pd.DataFrame(combined_final_results, columns=['Website URL'])
+        df = pd.DataFrame(combined_final_results, columns=["Website URL"])
 
-        df = df.to_excel('./final_results/' + output_folder + '/combined_final_results' + '.xlsx', engine='openpyxl', index=False)
+        df = df.to_excel(
+            "./final_results/" + output_folder + "/combined_final_results" + ".xlsx",
+            engine="openpyxl",
+            index=False,
+        )
 
         print(combined_final_results)
-    
+
+
 if __name__ == "__main__":
     main()
