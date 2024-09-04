@@ -15,6 +15,7 @@ from copyright import get_copyright
 import multiprocessing
 from helpers import set_log_file, get_log_file, get_links, extract_year
 import datetime
+from openpyxl import load_workbook
 
 load_dotenv()
 
@@ -173,7 +174,6 @@ def process_subsidiary(subsidiary, main_company, sample_expert_website_researche
     results = json_repair.loads(results.raw)
     
     return results
-
 def main():
     companies = [
         {
@@ -314,7 +314,7 @@ def main():
         combined_final_results = website_results.union(copyright_results).union(domain_search_results)
 
         df = pd.DataFrame(combined_final_results, columns=['Website URL'])
-
+        df_agentic_output = pd.DataFrame(combined_final_results, columns=['Agentic'])
         df = df.to_excel('./final_results/' + output_folder + '/combined_final_results' + '.xlsx', engine='openpyxl', index=False)
 
         print(combined_final_results)
@@ -333,9 +333,9 @@ def main():
             for result in results:
                 for link in list(result):
                     link_grabber_results.add(extract_domain_name(link))
-
+        
         df = pd.DataFrame(link_grabber_results, columns=['Website URL'])
-
+        df_link_grabber_output = pd.DataFrame(link_grabber_results, columns=['Link_Grabber'])
         df = df.to_excel('./final_results/' + output_folder + '/link_grabber_agent' + '.xlsx', engine='openpyxl', index=False)
 
         print(link_grabber_results)
@@ -348,6 +348,14 @@ def main():
             f.write(f"Time taken: {end_time - start_time}")
 
         print("Processing completed.")
-    
+
+        #code to map link grabber and agentic output into gtd.xlsx file
+        df_original = pd.read_excel(f'final_results/{output_folder}/gtd.xlsx')
+        df_original['Agentic'] = df_agentic_output['Agentic']
+        df_original['Link_Grabber'] = df_link_grabber_output['Link_Grabber']
+        df_original.to_excel(f'final_results/{output_folder}/gtd.xlsx', index=False)
+
+        print("Data has been written to updated_file.xlsx")
+
 if __name__ == "__main__":
     main()
