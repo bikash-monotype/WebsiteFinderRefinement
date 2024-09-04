@@ -2,6 +2,7 @@ from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
 import os
 from scrapegraphai.graphs import SmartScraperGraph
 from dotenv import load_dotenv
+from helpers import get_log_file
 
 load_dotenv()
 
@@ -41,18 +42,22 @@ graph_config = {
 }
 
 def get_copyright(url):
-    prompt = """
-        From the footer area of the provided webpage, extract the copyright text. 
-        Ensure the following:
-        1. Do not include 'All rights reserved' in the output.
-        2. If the copyright text is not found in the webpage, return {'copyright': None}.
-        3. The output should be in the format: {'copyright': 'Copyright © YEAR Company.'}
-    """
-    smart_scraper_graph = SmartScraperGraph(
-        prompt=prompt,
-        source = url,
-        config=graph_config,
-    )
-    result = smart_scraper_graph.run()
-    print(result)
-    return result
+    try :
+        prompt = """
+            From the footer area of the provided webpage, extract the copyright text. 
+            Ensure the following:
+            1. Do not include 'All rights reserved' in the output.
+            2. If the copyright text is not found in the webpage, return {'copyright': None}.
+            3. The output should be in the format: {'copyright': 'Copyright © YEAR Company.'}
+        """
+        smart_scraper_graph = SmartScraperGraph(
+            prompt=prompt,
+            source = url,
+            config=graph_config,
+        )
+        result = smart_scraper_graph.run()
+        return result
+    except Exception as e:
+        with open(get_log_file(), 'a') as f:
+            f.write(f"Exception when using scrapegraph AI: {e}")
+        return {'copyright': None}

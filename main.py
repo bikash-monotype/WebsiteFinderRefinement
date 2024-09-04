@@ -12,6 +12,9 @@ import urllib.parse
 import time
 from langchain_openai import AzureChatOpenAI
 from copyright import get_copyright
+import multiprocessing
+from helpers import set_log_file, get_log_file, get_links
+import datetime
 
 load_dotenv()
 
@@ -30,6 +33,11 @@ def extract_domain_name(url):
     domain_name = f"{extracted.domain}.{extracted.suffix}"
 
     return domain_name
+
+def process_website(website):
+    domain_name = extract_domain_name(website)
+    copyright_info = get_copyright(website)
+    return (domain_name, copyright_info)
 
 def extract_main_part(url):
     parsed_url = urllib.parse.urlparse(url)
@@ -54,30 +62,7 @@ def create_result_directory(output_folder):
     os.makedirs(new_folder_path, exist_ok=True)
     set_log_file(os.path.join(new_folder_path, "log.txt"))
 
-def set_log_file(file_path):
-    with open(file_path, 'w') as f:
-        f.write('')
-
-    config.log_file = file_path
-
-def get_log_file():
-    return config.log_file
-
-def main():
-    companies = [
-        # {
-        #     'file': 'turo_inc.xlsx',
-        #     'main_company': 'Turo Inc.',
-        #     'output_folder': 'TuroInc'
-        # },
-        {
-            'file': 'hiltonworldwide.xlsx',
-            'main_company': 'Hilton Worldwide Holdings, Inc.',
-            'output_folder': 'HiltonWorldwideHoldings'
-        },
-    ]
-
-    expert_website_researcher_agent_1 = Agent(
+expert_website_researcher_agent_1 = Agent(
         role="Expert Website Researcher",
         goal="Accurately identify the main website of the company {company_name} , which is a part of {main_company}.",
         verbose=True,
@@ -93,6 +78,62 @@ def main():
             You are meticulus and organized, and you only provide correct and precise data i.e. websites that you have identified correctly.""",
     )
 
+def process_subsidiary(subsidiary, main_company, sample_expert_website_researcher_output):
+    search_results1 = search_multiple_page(f"{subsidiary} a part of {main_company} official website", 10, 1)
+    search_results2 = search_multiple_page(f"{subsidiary} official website", 10, 1)
+    search_results3 = search_multiple_page(f"{subsidiary}", 10, 1)
+
+    search_results = json.dumps(search_results1 + search_results2 + search_results3)
+
+    expert_website_researcher_task_1 = Task(
+        description=(
+            """
+                {search_results}
+
+                Your task is to identify all potential official websites for the company {company_name}, which is a subsidiary of {main_company}, based on the search results provided above.
+
+                Instructions:
+                1. Thoroughly review each search result to ensure accuracy.
+                2. Identify the most relevant and official websites associated with {company_name}.
+                3. Consider factors such as domain authority, content relevance, and official branding.
+                4. Ensure the websites are possible official websites of the given subsidiary.
+                6. Exclude unrelated third-party profiles (e.g., Bloomberg, Meta, LinkedIn, Pitchbook, App store) unless they are the primary online presence of the company.
+                7. List all identified websites in a clear and organized manner.
+
+                Sample Output:
+                {sample_expert_website_researcher_output}
+
+                Important notes:
+                - Every set of rules and steps mentioned above must be followed to get the required results.
+                - Do not provide any other texts or information in the output as it will not work with the further process.
+                - Do not include ``` or any other such characters in the output.
+            """
+        ),
+        agent=expert_website_researcher_agent_1,  # Assigning the task to the researcher,
+        expected_output="All possible official website of the company. {company_name}",
+    )
+
+    expert_website_researcher_crew_1 = Crew(
+        agents=[expert_website_researcher_agent_1],
+        tasks=[expert_website_researcher_task_1],
+        process=Process.sequential,
+        verbose=1
+    )
+
+    results = expert_website_researcher_crew_1.kickoff(inputs={"company_name": subsidiary, "main_company": main_company, "search_results": search_results, "sample_expert_website_researcher_output": sample_expert_website_researcher_output})
+    results = json_repair.loads(results.raw)
+    
+    return results
+
+def main():
+    companies = [
+        {
+            'file': 'real_networks.xlsx',
+            'main_company': 'RealNetworks, Inc',
+            'output_folder': 'RealNetworksInc.'
+        }
+    ]
+
     sample_expert_website_researcher_output = {
         'subdisiary_name1': [
             'https://www.subdisiary_name1.com',
@@ -103,6 +144,8 @@ def main():
     sample_expert_website_researcher_output = json.dumps(sample_expert_website_researcher_output)
 
     for company in companies:
+        start_time = datetime.datetime.now()
+
         input_file = company['file']
         main_company = company['main_company']
         output_folder = company['output_folder']
@@ -115,52 +158,13 @@ def main():
 
         official_websites = set()
 
-        for subsidiary in file_company_list:
-            search_results1 = search_multiple_page(f"{subsidiary} a part of {main_company} official website", 10, 1)
-            search_results2 = search_multiple_page(f"{subsidiary} official website", 10, 1)
-            search_results3 = search_multiple_page(f"{subsidiary}", 10, 1)
-
-            search_results = json.dumps(search_results1 + search_results2 + search_results3)
-
-            expert_website_researcher_task_1 = Task(
-                description=(
-                    """
-                        {search_results}
-
-                        Your task is to identify all potential official websites for the company {company_name}, which is a subsidiary of {main_company}, based on the search results provided above.
-
-                        Instructions:
-                        1. Thoroughly review each search result to ensure accuracy.
-                        2. Identify the most relevant and official websites associated with {company_name}.
-                        3. Consider factors such as domain authority, content relevance, and official branding.
-                        4. Ensure the websites are possible official websites of the given subsidiary.
-                        6. Exclude unrelated third-party profiles (e.g., Bloomberg, Meta, LinkedIn, Pitchbook, App store) unless they are the primary online presence of the company.
-                        7. List all identified websites in a clear and organized manner.
-
-                        Sample Output:
-                        {sample_expert_website_researcher_output}
-
-                        Important notes:
-                        - Every set of rules and steps mentioned above must be followed to get the required results.
-                        - Do not provide any other texts or information in the output as it will not work with the further process.
-                        - Do not include ``` or any other such characters in the output.
-                    """
-                ),
-                agent=expert_website_researcher_agent_1,  # Assigning the task to the researcher,
-                expected_output="All possible official website of the company. {company_name}",
+        with multiprocessing.Pool(processes=3) as pool:
+            results = pool.starmap(
+                process_subsidiary,
+                [(subsidiary, main_company, sample_expert_website_researcher_output) for subsidiary in file_company_list]
             )
 
-            expert_website_researcher_crew_1 = Crew(
-                agents=[expert_website_researcher_agent_1],
-                tasks=[expert_website_researcher_task_1],
-                process=Process.sequential,
-                verbose=1
-            )
-
-            results = expert_website_researcher_crew_1.kickoff(inputs={"company_name": subsidiary, "main_company": main_company, "search_results": search_results, "sample_expert_website_researcher_output": sample_expert_website_researcher_output})
-            results = json_repair.loads(results.raw)
-            
-            final_results.append(results)
+        final_results.extend(results)
 
         data = []
         for result in final_results:
@@ -193,24 +197,38 @@ def main():
         website_urls = df['Website URL'].tolist()
         copyrights = []
 
-        for website in website_urls:
-            website_results.add(extract_domain_name(website))
-            copyright = get_copyright(website)
-            copyrights.append(copyright['copyright'])
+        with multiprocessing.Pool(processes=3) as pool:
+            results = pool.map(process_website, website_urls)
+
+        for domain_name, copyright_info in results:
+            website_results.add(domain_name)
+            if copyright_info['copyright'] is not None:
+                copyrights.append(copyright_info['copyright'])
+            else:
+                copyrights.append("N/A")
 
         df['Copyright'] = copyrights
 
         df.to_excel('./final_results/' + output_folder + '/website_research_agent' + '.xlsx', engine='openpyxl', index=False)
 
-        df = pd.read_excel('./final_results/' + output_folder + '/website_research_agent' + '.xlsx', engine='openpyxl')
-
-        copyrights = df['Copyright'].tolist()
-        copyrights = set(copyrights)
-
         copyright_results = set()
 
-        for copyright in list(copyrights):
-            copyright_result = search_multiple_page(f'"{copyright}" -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -news -blog -articles -forums -pdf -sec.gov -x.com -amazon -vimeo', 100, 3)
+        df = pd.read_excel('./final_results/' + output_folder + '/website_research_agent' + '.xlsx', engine='openpyxl')
+        
+        data = df[['Company Name', 'Copyright']]
+
+        data_cleaned = data.dropna(subset=['Copyright'])
+
+        unique_copyrights = data_cleaned.drop_duplicates(subset=['Copyright'])
+
+        for index, row in unique_copyrights.iterrows():
+            company_name = row['Company Name']
+            copyright = row['Copyright']
+
+            copyright_result1 = search_multiple_page(f'"{copyright}" -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -x.com -amazon -vimeo', 100, 3)
+            copyright_result2 = search_multiple_page(f'"© 2024 {company_name}" -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -x.com -amazon -vimeo', 100, 3)
+
+            copyright_result = copyright_result1 + copyright_result2
 
             for result in copyright_result:
                 try:
@@ -267,6 +285,34 @@ def main():
         df = df.to_excel('./final_results/' + output_folder + '/combined_final_results' + '.xlsx', engine='openpyxl', index=False)
 
         print(combined_final_results)
+
+        df = pd.read_excel('./final_results/' + output_folder + '/website_research_agent' + '.xlsx', engine='openpyxl')
+
+        website_urls = df['Website URL'].tolist()
+
+        link_grabber_results = set()
+
+        with multiprocessing.Pool(processes=5) as pool:
+            results = pool.map(get_links, website_urls)
+
+            for result in results:
+                for link in list(result):
+                    link_grabber_results.add(extract_domain_name(link))
+
+        df = pd.DataFrame(link_grabber_results, columns=['Website URL'])
+
+        df = df.to_excel('./final_results/' + output_folder + '/link_grabber_agent' + '.xlsx', engine='openpyxl', index=False)
+
+        print(link_grabber_results)
+
+        end_time = datetime.datetime.now()
+
+        print(f"Time taken: {end_time - start_time}")
+
+        with open(get_log_file(), 'a') as f:
+            f.write(f"Time taken: {end_time - start_time}")
+
+        print("Processing completed.")
     
 if __name__ == "__main__":
     main()
