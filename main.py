@@ -83,14 +83,23 @@ def process_copyright_research(row):
     words = copyright.split()
     filtered_words = [word for word in words if not re.search(r'\b(group|ltd)\b', word, re.IGNORECASE)]
     filtered_copyright = ' '.join(filtered_words)
+    filtered_copyright_ran_already = False
 
-    if filtered_copyright != copyright and filtered_copyright != ("© "+ year + " " + company_name):
+    if filtered_copyright != copyright:
+        filtered_copyright_ran_already = True
         copyright_result3 = search_multiple_page(
             f'"{filtered_copyright}" -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -x.com -amazon -vimeo', 100, 3)
     else:
         copyright_result3 = []
+
+    copyright_result4 = []
+
+    if ( year is not None and filtered_copyright != ("© "+ year + " " + company_name)):
+        if filtered_copyright_ran_already is False:
+            copyright_result4 = search_multiple_page(
+                f'"{filtered_copyright}" -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -x.com -amazon -vimeo', 100, 3)           
     
-    copyright_result = copyright_result1 + copyright_result2 + copyright_result3
+    copyright_result = copyright_result1 + copyright_result2 + copyright_result3 + copyright_result4
 
     for result in copyright_result:
         try:
@@ -188,10 +197,10 @@ def process_subsidiary(subsidiary, main_company, sample_expert_website_researche
 def main():
     companies = [
         {
-            'file': 'anthem_properties.xlsx',
-            'main_company': 'Anthem Properties Group',
-            'output_folder': 'AnthemPropertiesGroup'
-        }
+            'file': 'Toptal.xlsx',
+            'main_company': 'Toptal',
+            'output_folder': 'Toptal'
+        },
     ]
 
     sample_expert_website_researcher_output = {
@@ -258,7 +267,7 @@ def main():
 
         copyrights = []
 
-        with multiprocessing.Pool(processes=10) as pool:
+        with multiprocessing.Pool(processes=20) as pool:
             results = pool.map(process_website, list(set(website_urls)))
         
         print("Copyrights extracted")
@@ -284,7 +293,7 @@ def main():
 
         unique_copyrights = data_cleaned.drop_duplicates(subset=['Copyright'])
 
-        with multiprocessing.Pool(processes=10) as pool:
+        with multiprocessing.Pool(processes=20) as pool:
             results = pool.map(process_copyright_research, [row for index, row in unique_copyrights.iterrows()])
 
         for result in results:
@@ -310,7 +319,7 @@ def main():
         for website in website_urls:
             website_main_parts.add(extract_main_part(website))
 
-        with multiprocessing.Pool(processes=10) as pool:
+        with multiprocessing.Pool(processes=20) as pool:
             results = pool.map(process_domain_research, website_main_parts)
 
         for result in results:
@@ -338,7 +347,7 @@ def main():
 
         link_grabber_results = set()
 
-        with multiprocessing.Pool(processes=10) as pool:
+        with multiprocessing.Pool(processes=20) as pool:
             results = pool.map(get_links, list(website_urls))
 
             for result in results:
