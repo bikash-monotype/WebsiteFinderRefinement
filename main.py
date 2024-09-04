@@ -13,7 +13,7 @@ import time
 from langchain_openai import AzureChatOpenAI
 from copyright import get_copyright
 import multiprocessing
-from helpers import set_log_file, get_log_file, get_links
+from helpers import set_log_file, get_log_file, get_links, extract_year
 import datetime
 
 load_dotenv()
@@ -128,9 +128,9 @@ def process_subsidiary(subsidiary, main_company, sample_expert_website_researche
 def main():
     companies = [
         {
-            'file': 'real_networks.xlsx',
-            'main_company': 'RealNetworks, Inc',
-            'output_folder': 'RealNetworksInc.'
+            'file': 'ednc.xlsx',
+            'main_company': 'Economic Development Partnership of North Carolina',
+            'output_folder': 'EDNC.'
         }
     ]
 
@@ -225,9 +225,15 @@ def main():
             company_name = row['Company Name']
             copyright = row['Copyright']
 
-            copyright_result1 = search_multiple_page(f'"{copyright}" -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -x.com -amazon -vimeo', 100, 3)
-            copyright_result2 = search_multiple_page(f'"© 2024 {company_name}" -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -x.com -amazon -vimeo', 100, 3)
+            year = extract_year(copyright)
 
+            copyright_result1 = search_multiple_page(f'"{copyright}" -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -x.com -amazon -vimeo', 100, 3)
+            
+            if year is not None:
+                copyright_result2 = search_multiple_page(f'"© {year} {company_name}" -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -x.com -amazon -vimeo', 100, 3)
+            else:
+                copyright_result2 = []
+            
             copyright_result = copyright_result1 + copyright_result2
 
             for result in copyright_result:

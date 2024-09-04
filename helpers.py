@@ -2,6 +2,7 @@ from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeo
 import config
 import time
 import validators
+import re
 
 social_media_domains = [
     'facebook.com', 'twitter.com', 'instagram.com', 'cookiepedia.co.uk', 'fonts.googleapis.com', 'jwt.io', 'google-analytics.com', 'adobe.com',
@@ -20,6 +21,19 @@ def set_log_file(file_path):
 
 def get_log_file():
     return config.log_file
+
+def extract_year(copyright_text):
+    pattern = r'\b((?:19|20)?\d{2})(?:-(\d{2}|\d{4}))?\b'
+
+    match = re.search(pattern, copyright_text)
+    
+    if match:
+        if match.group(2):
+            return f"{match.group(1)}-{match.group(2)}"
+        else:
+            return match.group(1)
+    else:
+        return None
 
 def get_links(url):
     fin = set()
@@ -66,4 +80,3 @@ def get_all_links(url):
                 if page is not None:
                     page.close()
     return links
-
