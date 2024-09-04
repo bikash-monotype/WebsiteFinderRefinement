@@ -86,9 +86,9 @@ def main():
         #     'output_folder': 'TuroInc'
         # },
         {
-            "file": "Dapper Labs, Inc..xlsx",
-            "main_company": "Dapper Labs, Inc.",
-            "output_folder": "Dapper Labs, Inc.",
+            "file": "Delphix Corp..xlsx",
+            "main_company": "Delphix Corp.",
+            "output_folder": "Delphix Corp.",
         },
     ]
 
