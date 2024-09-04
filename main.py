@@ -317,7 +317,7 @@ def main():
         df_agentic_output = pd.DataFrame(combined_final_results, columns=['Agentic'])
         df = df.to_excel('./final_results/' + output_folder + '/combined_final_results' + '.xlsx', engine='openpyxl', index=False)
 
-        print(combined_final_results)
+        print(combined_final_results) #agent oupt
 
         df = pd.read_excel('./final_results/' + output_folder + '/website_research_agent' + '.xlsx', engine='openpyxl')
 
