@@ -16,6 +16,7 @@ import multiprocessing
 from helpers import set_log_file, get_log_file, get_links, extract_year
 import datetime
 from openpyxl import load_workbook
+import re
 
 load_dotenv()
 
@@ -78,8 +79,18 @@ def process_copyright_research(row):
             f'"© {year} {company_name}" -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -x.com -amazon -vimeo', 100, 3)
     else:
         copyright_result2 = []
+
+    words = copyright.split()
+    filtered_words = [word for word in words if not re.search(r'\b(group|ltd)\b', word, re.IGNORECASE)]
+    filtered_copyright = ' '.join(filtered_words)
+
+    if filtered_copyright != copyright and filtered_copyright != ("© "+ year + " " + company_name):
+        copyright_result3 = search_multiple_page(
+            f'"{filtered_copyright}" -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -x.com -amazon -vimeo', 100, 3)
+    else:
+        copyright_result3 = []
     
-    copyright_result = copyright_result1 + copyright_result2
+    copyright_result = copyright_result1 + copyright_result2 + copyright_result3
 
     for result in copyright_result:
         try:
@@ -177,9 +188,9 @@ def process_subsidiary(subsidiary, main_company, sample_expert_website_researche
 def main():
     companies = [
         {
-            'file': 'test.xlsx',
-            'main_company': 'Test',
-            'output_folder': 'Test'
+            'file': 'anthem_properties.xlsx',
+            'main_company': 'Anthem Properties Group',
+            'output_folder': 'AnthemPropertiesGroup'
         }
     ]
 
@@ -207,7 +218,7 @@ def main():
 
         official_websites = set()
 
-        with multiprocessing.Pool(processes=3) as pool:
+        with multiprocessing.Pool(processes=10) as pool:
             results = pool.starmap(
                 process_subsidiary,
                 [(subsidiary, main_company, sample_expert_website_researcher_output) for subsidiary in file_company_list]
@@ -350,12 +361,12 @@ def main():
         print("Processing completed.")
 
         #code to map link grabber and agentic output into gtd.xlsx file
-        df_original = pd.read_excel(f'final_results/{output_folder}/gtd.xlsx')
-        df_original['Agentic'] = df_agentic_output['Agentic']
-        df_original['Link_Grabber'] = df_link_grabber_output['Link_Grabber']
-        df_original.to_excel(f'final_results/{output_folder}/gtd.xlsx', index=False)
+        # df_original = pd.read_excel(f'final_results/{output_folder}/gtd.xlsx')
+        # df_original['Agentic'] = df_agentic_output['Agentic']
+        # df_original['Link_Grabber'] = df_link_grabber_output['Link_Grabber']
+        # df_original.to_excel(f'final_results/{output_folder}/gtd.xlsx', index=False)
 
-        print("Data has been written to updated_file.xlsx")
+        # print("Data has been written to updated_file.xlsx")
 
 if __name__ == "__main__":
     main()
