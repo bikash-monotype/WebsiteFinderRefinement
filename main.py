@@ -62,6 +62,55 @@ def create_result_directory(output_folder):
     os.makedirs(new_folder_path, exist_ok=True)
     set_log_file(os.path.join(new_folder_path, "log.txt"))
 
+def process_copyright_research(row):
+    company_name = row['Company Name']
+    copyright = row['Copyright']
+    copyright_results = set()
+
+    year = extract_year(copyright)
+
+    copyright_result1 = search_multiple_page(
+        f'"{copyright}" -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -x.com -amazon -vimeo', 100, 3)
+    
+    if year is not None:
+        copyright_result2 = search_multiple_page(
+            f'"© {year} {company_name}" -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -x.com -amazon -vimeo', 100, 3)
+    else:
+        copyright_result2 = []
+    
+    copyright_result = copyright_result1 + copyright_result2
+
+    for result in copyright_result:
+        try:
+            copyright_results.add(extract_domain_name(result['link']))
+
+            if "sitelinks" in result:
+                for sitelink in result["sitelinks"]:
+                    copyright_results.add(extract_domain_name(sitelink['link']))
+        except KeyError:
+            continue
+
+    return copyright_results
+
+def process_domain_research(main_part):
+    domain_search_results = set()
+    search_results1 = search_multiple_page(f"site:{main_part}.*", 100, 3)
+    search_results2 = search_multiple_page(f"site:{main_part}.*.*", 100, 3)
+
+    search_results = search_results1 + search_results2
+
+    for result in search_results:
+        try:
+            domain_search_results.add(extract_domain_name(result['link']))
+
+            if "sitelinks" in result:
+                for sitelink in result["sitelinks"]:
+                    domain_search_results.add(extract_domain_name(sitelink['link']))
+        except KeyError:
+            continue
+
+    return domain_search_results
+
 expert_website_researcher_agent_1 = Agent(
         role="Expert Website Researcher",
         goal="Accurately identify the main website of the company {company_name} , which is a part of {main_company}.",
@@ -128,9 +177,9 @@ def process_subsidiary(subsidiary, main_company, sample_expert_website_researche
 def main():
     companies = [
         {
-            'file': 'ednc.xlsx',
-            'main_company': 'Economic Development Partnership of North Carolina',
-            'output_folder': 'EDNC.'
+            'file': 'test.xlsx',
+            'main_company': 'Test',
+            'output_folder': 'Test'
         }
     ]
 
@@ -195,10 +244,13 @@ def main():
         website_results = set()
 
         website_urls = df['Website URL'].tolist()
+
         copyrights = []
 
-        with multiprocessing.Pool(processes=3) as pool:
-            results = pool.map(process_website, website_urls)
+        with multiprocessing.Pool(processes=10) as pool:
+            results = pool.map(process_website, list(set(website_urls)))
+        
+        print("Copyrights extracted")
 
         for domain_name, copyright_info in results:
             website_results.add(domain_name)
@@ -221,29 +273,13 @@ def main():
 
         unique_copyrights = data_cleaned.drop_duplicates(subset=['Copyright'])
 
-        for index, row in unique_copyrights.iterrows():
-            company_name = row['Company Name']
-            copyright = row['Copyright']
+        with multiprocessing.Pool(processes=10) as pool:
+            results = pool.map(process_copyright_research, [row for index, row in unique_copyrights.iterrows()])
 
-            year = extract_year(copyright)
+        for result in results:
+            copyright_results.update(result)
 
-            copyright_result1 = search_multiple_page(f'"{copyright}" -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -x.com -amazon -vimeo', 100, 3)
-            
-            if year is not None:
-                copyright_result2 = search_multiple_page(f'"© {year} {company_name}" -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -x.com -amazon -vimeo', 100, 3)
-            else:
-                copyright_result2 = []
-            
-            copyright_result = copyright_result1 + copyright_result2
-
-            for result in copyright_result:
-                try:
-                    copyright_results.add(extract_domain_name(result['link']))
-
-                    if "sitelinks" in result:
-                        copyright_results.add(extract_domain_name(result['link']))
-                except KeyError:
-                    continue
+        print(copyright_results)
 
         df = pd.DataFrame(copyright_results, columns=['Website URL'])
 
@@ -263,20 +299,11 @@ def main():
         for website in website_urls:
             website_main_parts.add(extract_main_part(website))
 
-        for main_part in website_main_parts:
-            search_results1 = search_multiple_page(f"site:{main_part}.*", 100, 3)
-            search_results2 = search_multiple_page(f"site:{main_part}.*.*", 100, 3)
+        with multiprocessing.Pool(processes=10) as pool:
+            results = pool.map(process_domain_research, website_main_parts)
 
-            search_results = search_results1 + search_results2
-
-            for result in search_results:
-                try:
-                    domain_search_results.add(extract_domain_name(result['link']))
-
-                    if "sitelinks" in result:
-                        domain_search_results.add(extract_domain_name(result['link']))
-                except KeyError:
-                    continue
+        for result in results:
+            domain_search_results.update(result)
 
         df = pd.DataFrame(domain_search_results, columns=['Website URL'])
 
@@ -296,10 +323,12 @@ def main():
 
         website_urls = df['Website URL'].tolist()
 
+        website_urls = set(website_urls)
+
         link_grabber_results = set()
 
-        with multiprocessing.Pool(processes=5) as pool:
-            results = pool.map(get_links, website_urls)
+        with multiprocessing.Pool(processes=10) as pool:
+            results = pool.map(get_links, list(website_urls))
 
             for result in results:
                 for link in list(result):

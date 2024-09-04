@@ -58,6 +58,7 @@ def get_copyright(url):
         result = smart_scraper_graph.run()
         return result
     except Exception as e:
-        with open(get_log_file(), 'a') as f:
-            f.write(f"Exception when using scrapegraph AI: {e}")
+        # with open(get_log_file(), 'a') as f:
+        #     f.write(f"Exception when using scrapegraph AI: {e}")
+        print(f"Exception when using scrapegraph AI: {e}")
         return {'copyright': None}

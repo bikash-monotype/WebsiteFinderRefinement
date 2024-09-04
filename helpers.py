@@ -64,16 +64,16 @@ def get_all_links(url):
                 links = page.eval_on_selector_all("[href]", "elements => elements.map(el => el.href)")
                 break
             except PlaywrightTimeoutError as te:
-                with open(get_log_file(), 'a') as f:
-                    f.write(f"(Link Grabber2) Timeout error processing {url} on attempt {attempt + 1}: {te}")
+                # with open(get_log_file(), 'a') as f:
+                #     f.write(f"(Link Grabber2) Timeout error processing {url} on attempt {attempt + 1}: {te}")
                 print(f"(Link Grabber2) Timeout error processing {url} on attempt {attempt + 1}: {te}")
                 if attempt < max_retries - 1:
                     time.sleep(2)
                 else:
                     return None
             except Exception as e:
-                with open(get_log_file(), 'a') as f:
-                    f.write(f"(Link Grabber2) Error processing {url}: {e}")
+                # with open(get_log_file(), 'a') as f:
+                #     f.write(f"(Link Grabber2) Error processing {url}: {e}")
                 print(f"(Link Grabber2) Error processing {url}: {e}")
                 return None
             finally:
