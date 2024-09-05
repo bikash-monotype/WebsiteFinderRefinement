@@ -197,10 +197,20 @@ def process_subsidiary(subsidiary, main_company, sample_expert_website_researche
 def main():
     companies = [
         {
-            'file': 'Toptal.xlsx',
-            'main_company': 'Toptal',
-            'output_folder': 'Toptal'
+            'file': 'NutraceuticalWellnessLLC.xlsx',
+            'main_company': 'Nutraceutical Wellness LLC',
+            'output_folder': 'NutraceuticalWellnessLLC'
         },
+        {
+            'file': 'NeimanMarcus.xlsx',
+            'main_company': 'Neiman Marcus',
+            'output_folder': 'NeimanMarcus'
+        },
+        {
+            'file': 'Palmers.xlsx',
+            'main_company': 'Palmers',
+            'output_folder': 'Palmers'
+        }
     ]
 
     sample_expert_website_researcher_output = {
@@ -369,13 +379,13 @@ def main():
 
         print("Processing completed.")
 
-        #code to map link grabber and agentic output into gtd.xlsx file
-        # df_original = pd.read_excel(f'final_results/{output_folder}/gtd.xlsx')
-        # df_original['Agentic'] = df_agentic_output['Agentic']
-        # df_original['Link_Grabber'] = df_link_grabber_output['Link_Grabber']
-        # df_original.to_excel(f'final_results/{output_folder}/gtd.xlsx', index=False)
+        # code to map link grabber and agentic output into gtd.xlsx file
+        df_original = pd.read_excel(f'final_results/{output_folder}/data_for_validation.xlsx')
+        df_original['Agentic'] = df_agentic_output['Agentic']
+        df_original['Link_Grabber'] = df_link_grabber_output['Link_Grabber']
+        df_original.to_excel(f'final_results/{output_folder}/data_for_validation.xlsx', index=False)
 
-        # print("Data has been written to updated_file.xlsx")
+        print("Data has been written to updated_file.xlsx")
 
 if __name__ == "__main__":
     main()
