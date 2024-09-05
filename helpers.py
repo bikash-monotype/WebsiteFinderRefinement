@@ -1,5 +1,4 @@
 from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
-import config
 import time
 import validators
 import re
@@ -13,14 +12,9 @@ social_media_domains = [
 def is_social_media_link(link):
     return any(domain in link for domain in social_media_domains)
 
-def set_log_file(file_path):
+def create_log_file(file_path):
     with open(file_path, 'w') as f:
         f.write('')
-
-    config.log_file = file_path
-
-def get_log_file():
-    return config.log_file
 
 def extract_year(copyright_text):
     pattern = r'\b((?:19|20)?\d{2})(?:-(\d{2}|\d{4}))?\b'
@@ -35,9 +29,9 @@ def extract_year(copyright_text):
     else:
         return None
 
-def get_links(url):
+def get_links(url, log_file_path):
     fin = set()
-    results = get_all_links(url)
+    results = get_all_links(url, log_file_path)
 
     if isinstance(results, list):
         for item in results:
@@ -46,7 +40,7 @@ def get_links(url):
 
     return fin
 
-def get_all_links(url):
+def get_all_links(url, log_file_path):
     print(url)
     max_retries = 3
     links = []
@@ -64,16 +58,16 @@ def get_all_links(url):
                 links = page.eval_on_selector_all("[href]", "elements => elements.map(el => el.href)")
                 break
             except PlaywrightTimeoutError as te:
-                # with open(get_log_file(), 'a') as f:
-                #     f.write(f"(Link Grabber2) Timeout error processing {url} on attempt {attempt + 1}: {te}")
+                with open(log_file_path, 'a') as f:
+                    f.write(f"(Link Grabber2) Timeout error processing {url} on attempt {attempt + 1}: {te}")
                 print(f"(Link Grabber2) Timeout error processing {url} on attempt {attempt + 1}: {te}")
                 if attempt < max_retries - 1:
                     time.sleep(2)
                 else:
                     return None
             except Exception as e:
-                # with open(get_log_file(), 'a') as f:
-                #     f.write(f"(Link Grabber2) Error processing {url}: {e}")
+                with open(log_file_path, 'a') as f:
+                    f.write(f"(Link Grabber2) Error processing {url}: {e}")
                 print(f"(Link Grabber2) Error processing {url}: {e}")
                 return None
             finally:

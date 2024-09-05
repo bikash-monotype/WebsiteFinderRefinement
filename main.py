@@ -13,10 +13,11 @@ import time
 from langchain_openai import AzureChatOpenAI
 from copyright import get_copyright
 import multiprocessing
-from helpers import set_log_file, get_log_file, get_links, extract_year
+from helpers import get_links, extract_year, create_log_file
 import datetime
 from openpyxl import load_workbook
 import re
+from functools import partial
 
 load_dotenv()
 
@@ -36,9 +37,9 @@ def extract_domain_name(url):
 
     return domain_name
 
-def process_website(website):
+def process_website(website, log_file_path):
     domain_name = extract_domain_name(website)
-    copyright_info = get_copyright(website)
+    copyright_info = get_copyright(website, log_file_path)
     return (domain_name, copyright_info)
 
 def extract_main_part(url):
@@ -62,9 +63,11 @@ def create_result_directory(output_folder):
     final_results_path = os.path.join(script_dir, "final_results")
     new_folder_path = os.path.join(final_results_path, output_folder)
     os.makedirs(new_folder_path, exist_ok=True)
-    set_log_file(os.path.join(new_folder_path, "log.txt"))
+    create_log_file(os.path.join(new_folder_path, "log.txt"))
 
-def process_copyright_research(row):
+    return os.path.join(new_folder_path, "log.txt")
+
+def process_copyright_research(row, log_file_path):
     company_name = row['Company Name']
     copyright = row['Copyright']
     copyright_results = set()
@@ -72,11 +75,11 @@ def process_copyright_research(row):
     year = extract_year(copyright)
 
     copyright_result1 = search_multiple_page(
-        f'"{copyright}" -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -x.com -amazon -vimeo', 100, 3)
+        f'"{copyright}" -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -x.com -amazon -vimeo', 100, 3, log_file_path)
     
     if year is not None:
         copyright_result2 = search_multiple_page(
-            f'"© {year} {company_name}" -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -x.com -amazon -vimeo', 100, 3)
+            f'"© {year} {company_name}" -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -x.com -amazon -vimeo', 100, 3, log_file_path)
     else:
         copyright_result2 = []
 
@@ -88,7 +91,7 @@ def process_copyright_research(row):
     if filtered_copyright != copyright:
         filtered_copyright_ran_already = True
         copyright_result3 = search_multiple_page(
-            f'"{filtered_copyright}" -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -x.com -amazon -vimeo', 100, 3)
+            f'"{filtered_copyright}" -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -x.com -amazon -vimeo', 100, 3, log_file_path)
     else:
         copyright_result3 = []
 
@@ -97,7 +100,7 @@ def process_copyright_research(row):
     if ( year is not None and filtered_copyright != ("© "+ year + " " + company_name)):
         if filtered_copyright_ran_already is False:
             copyright_result4 = search_multiple_page(
-                f'"{filtered_copyright}" -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -x.com -amazon -vimeo', 100, 3)           
+                f'"{filtered_copyright}" -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -x.com -amazon -vimeo', 100, 3, log_file_path)           
     
     copyright_result = copyright_result1 + copyright_result2 + copyright_result3 + copyright_result4
 
@@ -113,10 +116,10 @@ def process_copyright_research(row):
 
     return copyright_results
 
-def process_domain_research(main_part):
+def process_domain_research(main_part, log_file_path):
     domain_search_results = set()
-    search_results1 = search_multiple_page(f"site:{main_part}.*", 100, 3)
-    search_results2 = search_multiple_page(f"site:{main_part}.*.*", 100, 3)
+    search_results1 = search_multiple_page(f"site:{main_part}.*", 100, 3, log_file_path)
+    search_results2 = search_multiple_page(f"site:{main_part}.*.*", 100, 3, log_file_path)
 
     search_results = search_results1 + search_results2
 
@@ -148,10 +151,10 @@ expert_website_researcher_agent_1 = Agent(
             You are meticulus and organized, and you only provide correct and precise data i.e. websites that you have identified correctly.""",
     )
 
-def process_subsidiary(subsidiary, main_company, sample_expert_website_researcher_output):
-    search_results1 = search_multiple_page(f"{subsidiary} a part of {main_company} official website", 10, 1)
-    search_results2 = search_multiple_page(f"{subsidiary} official website", 10, 1)
-    search_results3 = search_multiple_page(f"{subsidiary}", 10, 1)
+def process_subsidiary(subsidiary, main_company, sample_expert_website_researcher_output, log_file_path):
+    search_results1 = search_multiple_page(f"{subsidiary} a part of {main_company} official website", 10, 1, log_file_path)
+    search_results2 = search_multiple_page(f"{subsidiary} official website", 10, 1, log_file_path)
+    search_results3 = search_multiple_page(f"{subsidiary}", 10, 1, log_file_path)
 
     search_results = json.dumps(search_results1 + search_results2 + search_results3)
 
@@ -194,23 +197,14 @@ def process_subsidiary(subsidiary, main_company, sample_expert_website_researche
     results = json_repair.loads(results.raw)
     
     return results
+
 def main():
     companies = [
         {
-            'file': 'NutraceuticalWellnessLLC.xlsx',
-            'main_company': 'Nutraceutical Wellness LLC',
-            'output_folder': 'NutraceuticalWellnessLLC'
+            'file': 'phillips66_missed.xlsx',
+            'main_company': 'Phillips 66',
+            'output_folder': 'Phillips66'
         },
-        {
-            'file': 'NeimanMarcus.xlsx',
-            'main_company': 'Neiman Marcus',
-            'output_folder': 'NeimanMarcus'
-        },
-        {
-            'file': 'Palmers.xlsx',
-            'main_company': 'Palmers',
-            'output_folder': 'Palmers'
-        }
     ]
 
     sample_expert_website_researcher_output = {
@@ -229,6 +223,8 @@ def main():
         main_company = company['main_company']
         output_folder = company['output_folder']
 
+        log_file_path = create_result_directory(output_folder)
+
         final_results = []
 
         file_company_list = read_chunks_from_file(input_file)
@@ -240,7 +236,7 @@ def main():
         with multiprocessing.Pool(processes=10) as pool:
             results = pool.starmap(
                 process_subsidiary,
-                [(subsidiary, main_company, sample_expert_website_researcher_output) for subsidiary in file_company_list]
+                [(subsidiary, main_company, sample_expert_website_researcher_output, log_file_path) for subsidiary in file_company_list]
             )
 
         final_results.extend(results)
@@ -259,9 +255,8 @@ def main():
                             full_domain = f"{scheme}://{domain_name}"
                             data.append({'Company Name': company, 'Website URL': full_domain})
             else:
-                with open(get_log_file(), 'a') as f:
-                    f.write(f"Skipping non-dict result: {result}")
-                print(f"Skipping non-dict result: {result}")
+                with open(log_file_path, 'a') as f:
+                    f.write(f"Skipping non-dict result from expert website researcher: {result}")
 
         df = pd.DataFrame(data, columns=['Company Name', 'Website URL'])
 
@@ -277,8 +272,10 @@ def main():
 
         copyrights = []
 
+        process_website_with_log_file = partial(process_website, log_file_path=log_file_path)
+
         with multiprocessing.Pool(processes=20) as pool:
-            results = pool.map(process_website, list(set(website_urls)))
+            results = pool.map(process_website_with_log_file, list(set(website_urls)))
         
         print("Copyrights extracted")
 
@@ -303,8 +300,10 @@ def main():
 
         unique_copyrights = data_cleaned.drop_duplicates(subset=['Copyright'])
 
+        process_copyright_research_with_log_file = partial(process_copyright_research, log_file_path=log_file_path)
+
         with multiprocessing.Pool(processes=20) as pool:
-            results = pool.map(process_copyright_research, [row for index, row in unique_copyrights.iterrows()])
+            results = pool.map(process_copyright_research_with_log_file, [row for index, row in unique_copyrights.iterrows()])
 
         for result in results:
             copyright_results.update(result)
@@ -329,8 +328,10 @@ def main():
         for website in website_urls:
             website_main_parts.add(extract_main_part(website))
 
+        process_domain_research_with_log_file = partial(process_domain_research, log_file_path=log_file_path)
+
         with multiprocessing.Pool(processes=20) as pool:
-            results = pool.map(process_domain_research, website_main_parts)
+            results = pool.map(process_domain_research_with_log_file, website_main_parts)
 
         for result in results:
             domain_search_results.update(result)
@@ -357,8 +358,10 @@ def main():
 
         link_grabber_results = set()
 
+        get_links_with_log_file = partial(get_links, log_file_path=log_file_path)
+
         with multiprocessing.Pool(processes=20) as pool:
-            results = pool.map(get_links, list(website_urls))
+            results = pool.map(get_links_with_log_file, list(website_urls))
 
             for result in results:
                 for link in list(result):
@@ -374,18 +377,18 @@ def main():
 
         print(f"Time taken: {end_time - start_time}")
 
-        with open(get_log_file(), 'a') as f:
+        with open(log_file_path, 'a') as f:
             f.write(f"Time taken: {end_time - start_time}")
 
         print("Processing completed.")
 
-        # code to map link grabber and agentic output into gtd.xlsx file
-        df_original = pd.read_excel(f'final_results/{output_folder}/data_for_validation.xlsx')
-        df_original['Agentic'] = df_agentic_output['Agentic']
-        df_original['Link_Grabber'] = df_link_grabber_output['Link_Grabber']
-        df_original.to_excel(f'final_results/{output_folder}/data_for_validation.xlsx', index=False)
+        # # code to map link grabber and agentic output into gtd.xlsx file
+        # df_original = pd.read_excel(f'final_results/{output_folder}/data_for_validation.xlsx')
+        # df_original['Agentic'] = df_agentic_output['Agentic']
+        # df_original['Link_Grabber'] = df_link_grabber_output['Link_Grabber']
+        # df_original.to_excel(f'final_results/{output_folder}/data_for_validation.xlsx', index=False)
 
-        print("Data has been written to updated_file.xlsx")
+        # print("Data has been written to updated_file.xlsx")
 
 if __name__ == "__main__":
     main()
