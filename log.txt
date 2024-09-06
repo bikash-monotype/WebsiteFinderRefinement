@@ -1,0 +1,1 @@
+Exception when getting company structures using Scrapegraph AI: Error code: 500 - {'statusCode': 500, 'message': 'Internal server error', 'activityId': '4775afea-497e-4fcd-b817-98744a19d9f1'}

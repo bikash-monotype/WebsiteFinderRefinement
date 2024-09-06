@@ -19,6 +19,8 @@ asyncio = "^3.4.3"
 pytest-playwright = "^0.5.1"
 tldextract = "5.1.2"
 scrapegraphai = "1.16.0"
+streamlit = "^1.38.0"
+watchdog = "^4.0.2"
 
 [tool.poetry.scripts]
 website_finder_refinement = "website_finder_refinement.main:run"

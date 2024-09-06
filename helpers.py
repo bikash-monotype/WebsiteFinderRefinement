@@ -2,6 +2,9 @@ from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeo
 import time
 import validators
 import re
+import os
+import urllib.parse
+import tldextract
 
 social_media_domains = [
     'facebook.com', 'twitter.com', 'instagram.com', 'cookiepedia.co.uk', 'fonts.googleapis.com', 'jwt.io', 'google-analytics.com', 'adobe.com',
@@ -9,12 +12,45 @@ social_media_domains = [
     'tiktok.com', 'snapchat.com', 'whatsapp.com', 'quora.com', 'google.com', 'github.com', 'apple.com', 'vimeo.com', 'youtu.be', 'cloudflare.net', 'goo.gl', 'mozilla.org', 'maps.app.goo.gl'
 ]
 
+def extract_main_part(url):
+    parsed_url = urllib.parse.urlparse(url)
+    extracted = tldextract.extract(parsed_url.netloc)
+    domain_name = extracted.domain
+
+    return domain_name
+
 def is_social_media_link(link):
     return any(domain in link for domain in social_media_domains)
 
 def create_log_file(file_path):
-    with open(file_path, 'w') as f:
-        f.write('')
+    if not os.path.exists(file_path):
+        with open(file_path, 'w') as f:
+            f.write('')
+
+def extract_domain_name(url):
+    parsed_url = urllib.parse.urlparse(url)
+    extracted = tldextract.extract(parsed_url.netloc)
+    domain_name = f"{extracted.domain}.{extracted.suffix}"
+
+    return domain_name
+
+def create_result_directory(output_folder):
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    final_results_path = os.path.join(script_dir, "final_results")
+    new_folder_path = os.path.join(final_results_path, output_folder)
+
+    if not os.path.exists(new_folder_path):
+        os.makedirs(new_folder_path, exist_ok=True)
+        
+    create_log_file(os.path.join(new_folder_path, "log.txt"))
+    create_log_file(os.path.join(new_folder_path, "llm.txt"))
+    create_log_file(os.path.join(new_folder_path, "serper.txt"))
+
+    return {
+        'log': os.path.join(new_folder_path, "log.txt"),
+        'llm': os.path.join(new_folder_path, "llm.txt"),
+        'serper': os.path.join(new_folder_path, "serper.txt"),
+    }
 
 def extract_year(copyright_text):
     pattern = r'\b((?:19|20)?\d{2})(?:-(\d{2}|\d{4}))?\b'

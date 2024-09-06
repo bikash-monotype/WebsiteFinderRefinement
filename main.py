@@ -10,7 +10,6 @@ import tldextract
 from tools import search_multiple_page
 import urllib.parse
 import time
-from langchain_openai import AzureChatOpenAI
 from copyright import get_copyright
 import multiprocessing
 from helpers import get_links, extract_year, create_log_file
@@ -314,8 +313,6 @@ def main():
 
         df = df.to_excel('./final_results/' + output_folder + '/copyright_research_agent' + '.xlsx', engine='openpyxl', index=False)
 
-        print(copyright_results)
-
         df = pd.read_excel('./final_results/' + output_folder + '/website_research_agent' + '.xlsx', engine='openpyxl')
 
         website_urls = df['Website URL'].tolist()
@@ -348,7 +345,7 @@ def main():
         df_agentic_output = pd.DataFrame(combined_final_results, columns=['Agentic'])
         df = df.to_excel('./final_results/' + output_folder + '/combined_final_results' + '.xlsx', engine='openpyxl', index=False)
 
-        print(combined_final_results) #agent oupt
+        print(combined_final_results)
 
         df = pd.read_excel('./final_results/' + output_folder + '/website_research_agent' + '.xlsx', engine='openpyxl')
 

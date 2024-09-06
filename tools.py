@@ -2,12 +2,14 @@ import os
 import requests
 import json
 from dotenv import load_dotenv
+from crewai_tools import BaseTool
 
 load_dotenv()
 
 def search_multiple_page(
     search_query: str, num_results: int, num_pages: int = 1, log_file_path = 'log.txt'
 ) -> str:
+    credits = 0
     url = os.getenv('SERPER_API_URL')
     headers = {
         "X-API-KEY": os.getenv('SERPER_API_KEY'),
@@ -21,14 +23,28 @@ def search_multiple_page(
         search_results = requests.request("POST", url, headers=headers, data=payload)
         results = search_results.json()
 
-        if results['statusCode'] != 200:
-            with open(log_file_path, 'a') as f:
-                f.write(f"\n(Serper Error) Error processing search query {search_query}: {results['message']}")
+        if 'statusCode' in results:
+            if results['statusCode'] != 200:
+                with open(log_file_path, 'a') as f:
+                    f.write(f"\n(Serper Error) Error processing search query {search_query}: {results['message']}")
 
         if "organic" in results and results["organic"]:
             all_results.extend(results["organic"])
+            credits += results['credits']
         else:
             break
 
-    return all_results
+    return {
+        'serper_credits': credits,
+        'all_results': all_results
+    }
 
+class SubsidiarySearchSerper(BaseTool):
+    name: str = "Subsidiary Searcher Tool"
+    description: str = (
+        "Searches the web based on a search query for the latest results. Uses the Serper API. This also returns the contents of the search results."
+    )
+
+    def _run(self, search_query: str) -> str:
+        search_results = search_multiple_page(search_query, 100, 3)
+        return search_results
