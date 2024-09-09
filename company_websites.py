@@ -1,6 +1,4 @@
 import multiprocessing
-import datetime
-import urllib.parse
 from crewai import Agent, Task, Crew, Process
 from langchain_openai import AzureChatOpenAI
 from tools import search_multiple_page
@@ -13,7 +11,6 @@ from helpers import extract_domain_name
 from copyright import get_copyright
 import re
 from helpers import extract_year, extract_main_part, get_links, process_worker_function
-import pandas as pd
 import dill
 from dotenv import load_dotenv
 
@@ -140,7 +137,6 @@ def process_subsidiary(subsidiary, main_company, sample_expert_website_researche
     )
     
     results = expert_website_researcher_crew_1.kickoff(inputs={"company_name": subsidiary, "main_company": main_company, "search_results": search_results, "sample_expert_website_researcher_output": sample_expert_website_researcher_output})
-    print(results.raw)
     results = json_repair.loads(results.raw)
 
     llm_usage = expert_website_researcher_crew_1.calculate_usage_metrics()

@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 from dotenv import load_dotenv
 import os
-from company_structures import get_company_structures, get_links_for_company_structures_for_private_company, get_links_for_company_structures
+from company_structures import get_company_structures, get_links_for_company_structures_for_private_company
 import multiprocessing
 from functools import partial
 from helpers import create_result_directory, extract_domain_name, get_main_domain, process_worker_function, calculate_openai_costs
@@ -137,6 +137,8 @@ if submit_button:
 
         st.write(f"###### Processing {len(urls)} URLs for finding subsidiaries")
 
+        st.write(urls)
+
         progress_bar = st.progress(0)
         total_urls = len(urls)
         progress_step = 1 / total_urls
@@ -182,7 +184,7 @@ if submit_button:
 
         st.write("###### Validating the subsidiaries")
         
-        valid_subsidiaries = validate_company_structure(company_structure_set, company_name)
+        valid_subsidiaries = validate_company_structure(company_structure_set, company_name, log_file_paths)
 
         filtered_agents_output_list = [item for item in valid_subsidiaries['correct_agentsOutputList'] if item is not None]
         st.markdown(f"<span style='color: green;'>####### {len(filtered_agents_output_list)} valid subsidiaries found.</span>", unsafe_allow_html=True)
@@ -196,30 +198,30 @@ if submit_button:
             f.write(f"Total Completion Tokens: {valid_subsidiaries['llm_usage']['completion_tokens']}\n")
             f.write(f"Total Cost in USD: {total_cost_USD}\n")
 
+        with open(log_file_paths['serper'], 'a') as f:
+            f.write("\n\n")
+            f.write(f"Validating subsidiaries:\n")
+            f.write(f"Total Credits: {valid_subsidiaries['serper_credits']}\n")
+
         whole_process_prompt_tokens += valid_subsidiaries['llm_usage']['prompt_tokens']
         whole_process_completion_tokens += valid_subsidiaries['llm_usage']['completion_tokens']
         whole_process_llm_costs += total_cost_USD
 
+        whole_process_serper_credits += valid_subsidiaries['serper_credits']
+
         export_df = pd.DataFrame({
             'AgentsOutput': valid_subsidiaries['agentsOutputList'],
             'ValidAgentsOutput': valid_subsidiaries['correct_agentsOutputList'],
-            'ErrorAgentsOutput': valid_subsidiaries['error_agentsOutputList']
+            'ValidAgentsReference': valid_subsidiaries['correct_agentsOutputListReference'],
+            'ErrorAgentsOutput': valid_subsidiaries['error_agentsOutputList'],
+            'ErrorAgentsReference': valid_subsidiaries['error_agentsOutputListReference']
         })
 
         export_df['Accuracy'] = valid_subsidiaries['accuracy']
         export_df['Error'] = valid_subsidiaries['error']
 
         export_df.to_excel(os.path.join(final_results_directory, company_name.replace('/', '-') + '.xlsx'), index=False, header=True)
-
-        # valid_subsidiaries = [
-        #     "AlphaSense",
-        #     "Stream Research Group",
-        #     "Tegus",
-        #     "Canalyst",
-        #     "Tabular",
-        #     "Salt Labs",
-        #     "Sightway Capital"
-        # ]
+    
         st.write("###### Finding official websites for the subsidiaries")
         websites = get_official_websites(filtered_agents_output_list, company_name, log_file_paths)
         total_cost_USD = calculate_openai_costs(websites['llm_usage']['prompt_tokens'], websites['llm_usage']['completion_tokens'])

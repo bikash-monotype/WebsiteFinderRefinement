@@ -2,7 +2,6 @@ import os
 import requests
 import json
 from dotenv import load_dotenv
-from crewai_tools import BaseTool
 
 load_dotenv()
 
