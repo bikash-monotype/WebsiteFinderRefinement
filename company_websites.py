@@ -12,12 +12,15 @@ from functools import partial
 from helpers import extract_domain_name
 from copyright import get_copyright
 import re
-from helpers import extract_year, extract_main_part, get_links
+from helpers import extract_year, extract_main_part, get_links, process_worker_function
 import pandas as pd
-from langchain_community.callbacks import get_openai_callback
+import dill
+from dotenv import load_dotenv
+
+load_dotenv()
 
 default_llm = AzureChatOpenAI(
-    azure_endpoint=os.getenv('AZURE_OPENAI_ENDPOINT'),
+    azure_endpoint='',
     model=os.getenv('AZURE_OPENAI_DEPLOYMENT_NAME'),
     openai_api_version=os.getenv('OPENAI_API_VERSION'),
     temperature=0
@@ -28,7 +31,7 @@ expert_website_researcher_agent_1 = Agent(
     goal="Accurately identify the main website of the company {company_name} , which is a part of {main_company}.",
     verbose=True,
     llm=default_llm,
-    model_name='gpt-4o',
+    model_name=os.getenv('AZURE_OPENAI_MODEL_NAME'),
     allow_delegation=False,
     backstory="""
         You have been a part of {main_company} for many years and have a deep understanding of the company's operations and online presence.
@@ -57,9 +60,11 @@ def process_website_and_get_copyrights(websites, log_file_paths):
     
     process_website_with_log_file = partial(process_single_website, log_file_path=log_file_paths)
 
+    serialized_function = dill.dumps(process_website_with_log_file)
+    
     with multiprocessing.Pool(processes=20) as pool:
         results = []
-        for i, result in enumerate(pool.map(process_website_with_log_file, list(websites))):
+        for i, result in enumerate(pool.starmap(process_worker_function, [(serialized_function, part) for part in list(websites)])):
             results.append(result)
             progress_bar.progress((i + 1) * progress_step)
 
@@ -111,7 +116,7 @@ def process_subsidiary(subsidiary, main_company, sample_expert_website_researche
                 2. Identify the most relevant and official websites associated with {company_name}.
                 3. Consider factors such as domain authority, content relevance, and official branding.
                 4. Ensure the websites are possible official websites of the given subsidiary.
-                6. Exclude unrelated third-party profiles (e.g., Bloomberg, Meta, LinkedIn, Pitchbook, App store) unless they are the primary online presence of the company.
+                6. Exclude unrelated third-party profiles (e.g., Bloomberg, Meta, LinkedIn, Pitchbook, App store, Wikipedia, Encyclopedia) unless they are the primary online presence of the company.
                 7. List all identified websites in a clear and organized manner.
 
                 Sample Output:
@@ -190,9 +195,11 @@ def process_domain_research(website_urls, log_file_paths):
 
     process_domain_research_with_log_file = partial(process_single_domain_research, log_file_paths=log_file_paths)
 
+    serialized_function = dill.dumps(process_domain_research_with_log_file)
+    
     with multiprocessing.Pool(processes=20) as pool:
         results = []
-        for i, result in enumerate(pool.map(process_domain_research_with_log_file, website_main_parts)):
+        for i, result in enumerate(pool.starmap(process_worker_function, [(serialized_function, part) for part in website_main_parts])):
             results.append(result)
             progress_bar.progress((i + 1) * progress_step)
 
@@ -216,9 +223,11 @@ def process_link_grabber(website_urls, log_file_paths):
 
     get_links_with_log_file = partial(get_links, log_file_path=log_file_paths['log'])
 
+    serialized_function = dill.dumps(get_links_with_log_file)
+
     with multiprocessing.Pool(processes=20) as pool:
         results = []
-        for i, result in enumerate(pool.map(get_links_with_log_file, list(website_urls))):
+        for i, result in enumerate(pool.starmap(process_worker_function, [(serialized_function, url) for url in list(website_urls)])):
             results.append(result)
             progress_bar.progress((i + 1) * progress_step)
 
@@ -236,11 +245,11 @@ def process_single_copyright_research(row, log_file_paths):
     year = extract_year(copyright)
 
     copyright_result1 = search_multiple_page(
-        f'"{copyright}" -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -x.com -amazon -vimeo', 100, 3, log_file_paths['log'])
+        f"'{copyright}' -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -x.com -amazon -vimeo", 100, 3, log_file_paths['log'])
     
     if year is not None:
         copyright_result2 = search_multiple_page(
-            f'"© {year} {company_name}" -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -x.com -amazon -vimeo', 100, 3, log_file_paths['log'])
+            f"'© {year} {company_name}' -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -x.com -amazon -vimeo", 100, 3, log_file_paths['log'])
     else:
         copyright_result2 = {
             'all_results': [],
@@ -255,7 +264,7 @@ def process_single_copyright_research(row, log_file_paths):
     if filtered_copyright != copyright:
         filtered_copyright_ran_already = True
         copyright_result3 = search_multiple_page(
-            f'"{filtered_copyright}" -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -x.com -amazon -vimeo', 100, 3, log_file_paths['log'])
+            f"'{filtered_copyright}' -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -x.com -amazon -vimeo", 100, 3, log_file_paths['log'])
     else:
         copyright_result3 = {
             'all_results': [],
@@ -270,8 +279,8 @@ def process_single_copyright_research(row, log_file_paths):
     if ( year is not None and filtered_copyright != ("© "+ year + " " + company_name)):
         if filtered_copyright_ran_already is False:
             copyright_result4 = search_multiple_page(
-                f'"{filtered_copyright}" -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -x.com -amazon -vimeo', 100, 3, log_file_paths['log'])           
-    
+                f"'{filtered_copyright}' -linkedin -quora -instagram -youtube -facebook -twitter -pinterest -snapchat -github -whatsapp -tiktok -reddit -x.com -amazon -vimeo", 100, 3, log_file_paths['log'])
+
     copyright_result = copyright_result1['all_results'] + copyright_result2['all_results'] + copyright_result3['all_results'] + copyright_result4['all_results']
 
     for result in copyright_result:
@@ -297,14 +306,16 @@ def process_copyright_research(unique_copyrights, log_file_paths):
     total_serper_credits = 0
 
     progress_bar = st.progress(0)
-    total_copyrights = len(unique_copyrights)
+    total_copyrights = unique_copyrights.shape[0]
     progress_step = 1 / total_copyrights
 
     process_copyright_research_with_log_file = partial(process_single_copyright_research, log_file_paths=log_file_paths)
 
+    serialized_function = dill.dumps(process_copyright_research_with_log_file)
+    
     with multiprocessing.Pool(processes=20) as pool:
         results = []
-        for i, result in enumerate(pool.map(process_copyright_research_with_log_file, [row for index, row in unique_copyrights.iterrows()])):
+        for i, result in enumerate(pool.starmap(process_worker_function, [(serialized_function, row) for index, row in unique_copyrights.iterrows()])):
             results.append(result)
             progress_bar.progress((i + 1) * progress_step)
 
@@ -326,8 +337,6 @@ def get_official_websites(file_company_list, main_company, log_file_paths):
     }
 
     final_results = []
-
-    official_websites = set()
 
     progress_bar = st.progress(0)
     total_subsidiaries = len(file_company_list)
@@ -361,21 +370,13 @@ def get_official_websites(file_company_list, main_company, log_file_paths):
                 
                 for company, urls in websites.items():
                     for url in urls:
-                        parsed_url = urllib.parse.urlparse(url)
-                        scheme = parsed_url.scheme
-                        domain_name = parsed_url.netloc
-
-                        if domain_name not in official_websites:
-                            official_websites.add(domain_name)
-                            full_domain = f"{scheme}://{domain_name}"
-                            data.append({'Company Name': company, 'Website URL': full_domain})
+                        data.append({'Company Name': company, 'Website URL': url})
             else:
                 with open(log_file_paths['log'], 'a') as f:
                     f.write(f"Skipping result with missing 'websites' or 'llm_usage' key: {result}")
         else:
             with open(log_file_paths['log'], 'a') as f:
                 f.write(f"Skipping non-dict result from expert website researcher: {result}")
-
     return {
         'data': data,
         'llm_usage': {

@@ -5,12 +5,21 @@ import re
 import os
 import urllib.parse
 import tldextract
+import dill
+from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
+from dotenv import load_dotenv
+
+load_dotenv()
 
 social_media_domains = [
     'facebook.com', 'twitter.com', 'instagram.com', 'cookiepedia.co.uk', 'fonts.googleapis.com', 'jwt.io', 'google-analytics.com', 'adobe.com',
     'threads.net', 'linkedin.com', 'pinterest.com', 'youtube.com', 'onetrust.com', 'amazon.com', 'reddit.com', 'wordpress.org', 'adobe.io',
     'tiktok.com', 'snapchat.com', 'whatsapp.com', 'quora.com', 'google.com', 'github.com', 'apple.com', 'vimeo.com', 'youtu.be', 'cloudflare.net', 'goo.gl', 'mozilla.org', 'maps.app.goo.gl'
 ]
+
+def process_worker_function(serialized_func, row):
+    func = dill.loads(serialized_func)
+    return func(row)
 
 def extract_main_part(url):
     parsed_url = urllib.parse.urlparse(url)
@@ -19,6 +28,15 @@ def extract_main_part(url):
 
     return domain_name
 
+def calculate_openai_costs(input_tokens, output_tokens):
+    input_cost = (input_tokens / 1000) * float(os.getenv('AZURE_OPENAI_MODEL_INPUT_TOKENS_COST'))
+    output_cost = (output_tokens / 1000) * float(os.getenv('AZURE_OPENAI_MODEL_OUTPUT_TOKENS_COST'))
+    return (input_cost + output_cost)
+
+def get_main_domain(url):
+    parsed_url = urllib.parse.urlparse(url)
+    return f"{parsed_url.scheme}://{parsed_url.netloc}"
+
 def is_social_media_link(link):
     return any(domain in link for domain in social_media_domains)
 
@@ -26,6 +44,37 @@ def create_log_file(file_path):
     if not os.path.exists(file_path):
         with open(file_path, 'w') as f:
             f.write('')
+
+def remove_trailing_slash(links):
+    return [link.rstrip('/') for link in links]
+
+def get_scrapegraph_config():
+    azure_model = AzureChatOpenAI(
+        openai_api_version=os.getenv('OPENAI_API_VERSION'),
+        azure_deployment=os.getenv('AZURE_OPENAI_DEPLOYMENT_NAME'),
+        azure_endpoint=os.getenv('AZURE_OPENAI_ENDPOINT'),
+        api_key=os.getenv('AZURE_OPENAI_API_KEY'),
+        temperature=0
+    )
+
+    azure_embeddings = AzureOpenAIEmbeddings(
+        azure_deployment=os.getenv('AZURE_OPENAI_EMBEDDINGS'),
+        openai_api_version="2023-05-15",
+        azure_endpoint=os.getenv('AZURE_OPENAI_ENDPOINT'),
+        api_key=os.getenv('AZURE_OPENAI_API_KEY'),
+    )
+
+    return {
+        "llm": {
+            "model_instance": azure_model,
+            "model_tokens": 100000,
+        },
+        "embeddings": {
+            "model_instance": azure_embeddings
+        },
+        "verbose": True,
+        "headless": False,
+    }
 
 def extract_domain_name(url):
     parsed_url = urllib.parse.urlparse(url)

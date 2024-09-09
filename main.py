@@ -139,7 +139,7 @@ expert_website_researcher_agent_1 = Agent(
         goal="Accurately identify the main website of the company {company_name} , which is a part of {main_company}.",
         verbose=True,
         llm=default_llm,
-        model_name='gpt-4o',
+        model_name=os.getenv('AZURE_OPENAI_MODEL_NAME'),
         allow_delegation=False,
         backstory="""
             You have been a part of {main_company} for many years and have a deep understanding of the company's operations and online presence.
@@ -169,7 +169,7 @@ def process_subsidiary(subsidiary, main_company, sample_expert_website_researche
                 2. Identify the most relevant and official websites associated with {company_name}.
                 3. Consider factors such as domain authority, content relevance, and official branding.
                 4. Ensure the websites are possible official websites of the given subsidiary.
-                6. Exclude unrelated third-party profiles (e.g., Bloomberg, Meta, LinkedIn, Pitchbook, App store) unless they are the primary online presence of the company.
+                6. Exclude unrelated third-party profiles (e.g., Bloomberg, Meta, LinkedIn, Pitchbook, App store, Wikipedia) unless they are the primary online presence of the company.
                 7. List all identified websites in a clear and organized manner.
 
                 Sample Output:

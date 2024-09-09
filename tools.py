@@ -38,13 +38,3 @@ def search_multiple_page(
         'serper_credits': credits,
         'all_results': all_results
     }
-
-class SubsidiarySearchSerper(BaseTool):
-    name: str = "Subsidiary Searcher Tool"
-    description: str = (
-        "Searches the web based on a search query for the latest results. Uses the Serper API. This also returns the contents of the search results."
-    )
-
-    def _run(self, search_query: str) -> str:
-        search_results = search_multiple_page(search_query, 100, 3)
-        return search_results

@@ -2,3 +2,5 @@ final_results/
 data/
 .env
 __pycache__/
+final_results-old/
+venv/
