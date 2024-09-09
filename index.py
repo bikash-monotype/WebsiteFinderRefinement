@@ -184,7 +184,8 @@ if submit_button:
         
         valid_subsidiaries = validate_company_structure(company_structure_set, company_name)
 
-        st.markdown(f"<span style='color: green;'>####### {len(valid_subsidiaries['correct_agentsOutputList'])} valid subsidiaries found.</span>", unsafe_allow_html=True)
+        filtered_agents_output_list = [item for item in valid_subsidiaries['correct_agentsOutputList'] if item is not None]
+        st.markdown(f"<span style='color: green;'>####### {len(filtered_agents_output_list)} valid subsidiaries found.</span>", unsafe_allow_html=True)
 
         total_cost_USD = calculate_openai_costs(valid_subsidiaries['llm_usage']['prompt_tokens'], valid_subsidiaries['llm_usage']['completion_tokens'])
 
@@ -220,8 +221,7 @@ if submit_button:
         #     "Sightway Capital"
         # ]
         st.write("###### Finding official websites for the subsidiaries")
-        websites = get_official_websites(valid_subsidiaries['correct_agentsOutputList'], company_name, log_file_paths)
-
+        websites = get_official_websites(filtered_agents_output_list, company_name, log_file_paths)
         total_cost_USD = calculate_openai_costs(websites['llm_usage']['prompt_tokens'], websites['llm_usage']['completion_tokens'])
 
         with open(log_file_paths['llm'], 'a') as f:
