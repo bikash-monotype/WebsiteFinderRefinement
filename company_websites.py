@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 default_llm = AzureChatOpenAI(
-    azure_endpoint='',
+    azure_endpoint=os.getenv('AZURE_OPENAI_ENDPOINT'),
     model=os.getenv('AZURE_OPENAI_DEPLOYMENT_NAME'),
     openai_api_version=os.getenv('OPENAI_API_VERSION'),
     temperature=0
