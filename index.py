@@ -322,7 +322,7 @@ if submit_button:
         st.write('###### Start validation of the domains')
         st.write('###### Remove unreachable, on sale and redirected domains')
 
-        response = validate_domains(combined_results, company_name, log_file_paths)
+        response = validate_domains(combined_final_results, company_name, log_file_paths)
 
         export_df = pd.DataFrame({
             'Domains': response['invalid_non_working_domains'].keys(),
