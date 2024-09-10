@@ -1,4 +1,4 @@
-from langchain_openai import AzureChatOpenAI
+from langchain_openai import ChatOpenAI
 import os
 from scrapegraphai.graphs import SmartScraperGraph
 from dotenv import load_dotenv
@@ -7,22 +7,16 @@ from crewai import Agent, Task, Crew
 from tools import search_multiple_page
 from helpers import remove_trailing_slash, get_scrapegraph_config
 import json_repair
+import time
 
 load_dotenv()
 
-default_llm = AzureChatOpenAI(
-    azure_endpoint='',
-    model=os.getenv('AZURE_OPENAI_DEPLOYMENT_NAME'),
-    openai_api_version=os.getenv('OPENAI_API_VERSION'),
-    temperature=0
-)
+os.environ['OPENAI_API_KEY'] = 'sk-1234567890abcdef1234567890abcdef'
 
-os.environ['AZURE_OPENAI_ENDPOINT'] = os.getenv('AZURE_OPENAI_ENDPOINT')
-os.environ['AZURE_OPENAI_CHAT_DEPLOYMENT_NAME'] = os.getenv('AZURE_OPENAI_DEPLOYMENT_NAME')
-os.environ['MODEL_NAME'] = 'Azure'
-os.environ['AZURE_OPENAI_API_KEY'] = os.getenv('AZURE_OPENAI_API_KEY')
-os.environ['AZURE_OPENAI_API_VERSION'] = '2023-08-01-preview'
-os.environ['AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT_NAME'] = os.getenv('AZURE_OPENAI_EMBEDDINGS')
+default_llm = ChatOpenAI(
+    model='llama3.1:8b',
+    base_url='http://localhost:11434/v1/',
+)
 
 graph_config = get_scrapegraph_config()
 

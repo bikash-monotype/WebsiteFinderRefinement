@@ -98,6 +98,10 @@ if submit_button:
 
             all_links = get_links_for_company_structures_for_private_company(company_name, log_file_paths['log'])
 
+            print(all_links)
+
+            exit()
+
             total_cost_USD = calculate_openai_costs(all_links['llm_usage']['prompt_tokens'], all_links['llm_usage']['completion_tokens'])
 
             whole_process_prompt_tokens += all_links['llm_usage']['prompt_tokens']
