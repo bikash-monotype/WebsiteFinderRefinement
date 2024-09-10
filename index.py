@@ -12,6 +12,7 @@ from company_structures_validation import validate_company_structure
 from company_websites import get_official_websites, process_website_and_get_copyrights, process_copyright_research, process_domain_research, process_link_grabber
 import dill
 import numpy as np
+from company_websites_validation import validate_domains
 
 load_dotenv()
 
@@ -136,8 +137,6 @@ if submit_button:
             # dont forget to add the results to the links and llm cost and serper credits
 
         st.write(f"###### Processing {len(urls)} URLs for finding subsidiaries")
-
-        st.write(urls)
 
         progress_bar = st.progress(0)
         total_urls = len(urls)
@@ -320,6 +319,54 @@ if submit_button:
         df = pd.DataFrame(link_grabber_results, columns=['Website URL'])
         df.to_excel(os.path.join(final_results_directory, 'link_grabber_agent' + '.xlsx'), index=False, header=True)
 
+        st.write('###### Start validation of the domains')
+        st.write('###### Remove unreachable, on sale and redirected domains')
+
+        response = validate_domains(combined_results, company_name, log_file_paths)
+
+        export_df = pd.DataFrame({
+            'Domains': response['invalid_non_working_domains'].keys(),
+            'Reason': response['invalid_non_working_domains'].values()
+        })
+
+        export_df.to_excel(os.path.join(final_results_directory, 'invalid_non_working_domains.xlsx'), index=False, header=True)
+
+        export_df = pd.DataFrame({
+            'Domains': response['final_valid_working_domains_dict'].keys(),
+            'Reason': response['final_valid_working_domains_dict'].values()
+        })
+
+        export_df.to_excel(os.path.join(final_results_directory, 'final_valid_working_domains.xlsx'), index=False, header=True)
+
+        export_df = pd.DataFrame({
+            'Domains': response['final_invalid_non_working_domains_dict'].keys(),
+            'Reason': response['final_invalid_non_working_domains_dict'].values()
+        })
+
+        export_df.to_excel(os.path.join(final_results_directory, 'final_invalid_non_working_domains.xlsx'), index=False, header=True)
+
+        with open(log_file_paths['serper'], 'a') as f:
+            f.write("\n\n")
+            f.write(f"Validation domains.\n")
+            f.write(f"Total Credits: {response['total_serper_credits']}\n")
+
+        with open(log_file_paths['llm'], 'a') as f:
+            f.write("\n\n")
+            f.write(f"Validating domains:\n")
+            f.write(f"Total Prompt Tokens: {response['total_prompt_tokens']}\n")
+            f.write(f"Total Completion Tokens: {response['total_completion_tokens']}\n")
+            f.write(f"Total Cost in USD: {response['total_cost_USD']}\n")
+
+        whole_process_prompt_tokens += response['total_prompt_tokens']
+        whole_process_completion_tokens += response['total_completion_tokens']
+        whole_process_llm_costs += response['total_cost_USD']
+        whole_process_serper_credits += response['total_serper_credits']
+
+        st.write(f"Total Prompt Tokens: {whole_process_prompt_tokens}")
+        st.write(f"Total Completion Tokens: {whole_process_completion_tokens}")
+        st.write(f"Total Cost in USD: {whole_process_llm_costs}")
+        st.write(f"Total Serper Credits: {whole_process_serper_credits}")
+
         endtime = datetime.now() - start_time
 
         with open(log_file_paths['log'], 'a') as f:
@@ -329,11 +376,5 @@ if submit_button:
             f.write(f"Total Completion Tokens: {whole_process_completion_tokens}\n")
             f.write(f"Total Cost in USD: {whole_process_llm_costs}\n")
             f.write(f"Total Serper Credits: {whole_process_serper_credits}\n")
-        
-        st.write(f"Total Prompt Tokens: {whole_process_prompt_tokens}")
-        st.write(f"Total Completion Tokens: {whole_process_completion_tokens}")
-        st.write(f"Total Cost in USD: {whole_process_llm_costs}")
-        st.write(f"Total Serper Credits: {whole_process_serper_credits}")
-        st.write(f"Time taken to run this whole process {endtime}")
     except Exception as e:
         st.error(f"An error occurred: {e}")
