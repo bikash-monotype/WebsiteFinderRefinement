@@ -136,14 +136,10 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
         'serper_credits': search_results['serper_credits']
     }
 
-def validate_domains(domains, main_company, log_file_path):
+def validate_working_domains(domains, log_file_path):
     total_prompt_tokens = 0
     total_completion_tokens = 0
     total_cost_USD = 0.0
-
-    total_prompt_tokens2 = 0
-    total_completion_tokens2 = 0
-    total_serper_credits = 0
 
     domains = [
         domain if domain.startswith('http://') or domain.startswith('https://') else f'https://{domain}'
@@ -179,6 +175,31 @@ def validate_domains(domains, main_company, log_file_path):
                     total_prompt_tokens += exec_info.get('prompt_tokens', 0)
                     total_completion_tokens += exec_info.get('completion_tokens', 0)
                     total_cost_USD += exec_info.get('total_cost_USD', 0.0)
+
+    return {
+        'valid_working_domains': valid_working_domains,
+        'invalid_non_working_domains': invalid_non_working_domains,
+        'total_prompt_tokens': total_prompt_tokens,
+        'total_completion_tokens': total_completion_tokens,
+        'total_cost_USD': total_cost_USD
+    }
+
+def validate_domains(domains, main_company, log_file_path):
+    total_prompt_tokens = 0
+    total_completion_tokens = 0
+    total_cost_USD = 0.0
+
+    total_prompt_tokens2 = 0
+    total_completion_tokens2 = 0
+    total_serper_credits = 0
+
+    response = validate_working_domains(domains, log_file_path)
+
+    valid_working_domains = response['valid_working_domains']
+    invalid_non_working_domains = response['invalid_non_working_domains']
+    total_prompt_tokens += response['total_prompt_tokens']
+    total_completion_tokens += response['total_completion_tokens']
+    total_cost_USD += response['total_cost_USD']
 
     st.write('###### Remove incorrect domains')
 

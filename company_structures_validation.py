@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from crewai import Agent, Task, Crew, Process
 import streamlit as st
 import multiprocessing
-from helpers import process_worker_function, calculate_openai_costs
+from helpers import process_worker_function, calculate_openai_costs, pad_list
 import dill
 from functools import partial
 from tools import search_multiple_page
@@ -37,9 +37,6 @@ company_structures_validation_researcher = Agent(
         """
     )
 )
-
-def pad_list(lst, length):
-    return lst + [None] * (length - len(lst))
 
 def process_single_company_structure_validation(main_company, subsidiary, log_file_paths):
     search_results = search_multiple_page(f"is {subsidiary} a part of {main_company}?", 10, 1, log_file_path=log_file_paths['log'])

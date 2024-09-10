@@ -56,7 +56,7 @@ if submit_button:
         folder_name = datetime.now().strftime("%Y%m%d%H%M%S")
         result_directory = f"{company_name}_{folder_name}"
         final_results_directory = f"final_results/{result_directory}"
-        log_file_paths = create_result_directory(result_directory)
+        log_file_paths = create_result_directory(result_directory, 'final_results')
 
         whole_process_prompt_tokens = 0
         whole_process_completion_tokens = 0

@@ -48,6 +48,9 @@ def create_log_file(file_path):
 def remove_trailing_slash(links):
     return [link.rstrip('/') for link in links]
 
+def pad_list(lst, length):
+    return lst + [None] * (length - len(lst))
+
 def get_scrapegraph_config():
     azure_model = AzureChatOpenAI(
         openai_api_version=os.getenv('OPENAI_API_VERSION'),
@@ -119,9 +122,9 @@ def extract_domain_name(url):
 
     return domain_name
 
-def create_result_directory(output_folder):
+def create_result_directory(output_folder, main_directory):
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    final_results_path = os.path.join(script_dir, "final_results")
+    final_results_path = os.path.join(script_dir, main_directory)
     new_folder_path = os.path.join(final_results_path, output_folder)
 
     if not os.path.exists(new_folder_path):

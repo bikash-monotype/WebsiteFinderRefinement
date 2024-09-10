@@ -4,3 +4,4 @@ data/
 __pycache__/
 final_results-old/
 venv/
+validation/
