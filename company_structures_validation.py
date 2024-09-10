@@ -1,5 +1,3 @@
-from textwrap import dedent
-import pandas as pd
 from langchain_openai import AzureChatOpenAI
 import json_repair
 import os
@@ -118,10 +116,14 @@ def validate_company_structure(agentsOutput, company_name, log_file_paths):
                 progress_bar.progress(min((i + 1) * progress_step, 1.0))
 
         for res in results:
-            if res['results'][1] == 'Yes':
-                correct_agentsOutputDict[res['results'][0]] = res['results'][2]
+            if 'results' in res and len(res['results']) >= 3:
+                if res['results'][1] == 'Yes':
+                    correct_agentsOutputDict[res['results'][0]] = res['results'][2]
+                else:
+                    error_agentsOutputDict[res['results'][0]] = res['results'][2]
             else:
-                error_agentsOutputDict[res['results'][0]] = res['results'][2]
+                with open(log_file_paths['log'], 'a') as f:
+                    f.write(f"Skipping non-dict result from expert website researcher: {str(res)}\n")
 
             llm_usage['prompt_tokens'] += res['llm_usage']['prompt_tokens']
             llm_usage['completion_tokens'] += res['llm_usage']['completion_tokens']
