@@ -5,3 +5,4 @@ __pycache__/
 final_results-old/
 venv/
 validation/
+validation_input/

@@ -221,10 +221,14 @@ def validate_domains(domains, main_company, log_file_path):
             progress_bar.progress(min((i + 1) * progress_step, 1.0))
 
     for res in results:
-        if res['results'][1] != 'Yes':
-            invalid_non_working_domains_dict[res['results'][0]] = res['results'][2]
+        if len(res['results']) >= 3:
+            if res['results'][1] != 'Yes':
+                invalid_non_working_domains_dict[res['results'][0]] = res['results'][2]
+            else:
+                valid_working_domains_dict[res['results'][0]] = res['results'][2]
         else:
-            valid_working_domains_dict[res['results'][0]] = res['results'][2]
+            with open(log_file_path['log'], 'a') as f:
+                f.write(f"Unexpected format in results: {res['results']}")
 
         total_prompt_tokens2 += res['llm_usage']['prompt_tokens']
         total_completion_tokens2 += res['llm_usage']['completion_tokens']

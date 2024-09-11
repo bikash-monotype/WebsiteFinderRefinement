@@ -116,6 +116,9 @@ def is_valid_working_domain(url, log_file_paths):
     return valid_domain
 
 def extract_domain_name(url):
+    if not url.startswith(('http://', 'https://')):
+        return url
+    
     parsed_url = urllib.parse.urlparse(url)
     extracted = tldextract.extract(parsed_url.netloc)
     domain_name = f"{extracted.domain}.{extracted.suffix}"
