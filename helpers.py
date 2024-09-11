@@ -8,6 +8,9 @@ import tldextract
 import dill
 from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
 from dotenv import load_dotenv
+import requests
+from requests.exceptions import ConnectTimeout
+from tenacity import retry, stop_after_attempt, wait_fixed
 
 load_dotenv()
 
@@ -16,6 +19,10 @@ social_media_domains = [
     'threads.net', 'linkedin.com', 'pinterest.com', 'youtube.com', 'onetrust.com', 'amazon.com', 'reddit.com', 'wordpress.org', 'adobe.io',
     'tiktok.com', 'snapchat.com', 'whatsapp.com', 'quora.com', 'google.com', 'github.com', 'apple.com', 'vimeo.com', 'youtu.be', 'cloudflare.net', 'goo.gl', 'mozilla.org', 'maps.app.goo.gl'
 ]
+
+@retry(stop=stop_after_attempt(3), wait=wait_fixed(2), retry=(lambda e: isinstance(e, ConnectTimeout)))
+def make_request(url, headers, payload):
+    return requests.request("POST", url, headers=headers, data=payload)
 
 def process_worker_function(serialized_func, row):
     func = dill.loads(serialized_func)

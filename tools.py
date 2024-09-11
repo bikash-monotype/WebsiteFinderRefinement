@@ -2,6 +2,7 @@ import os
 import requests
 import json
 from dotenv import load_dotenv
+from helpers import make_request
 
 load_dotenv()
 
@@ -19,7 +20,7 @@ def search_multiple_page(
 
     for page in range(1, num_pages + 1):
         payload = json.dumps({"q": search_query, "num": num_results, "page": page})
-        search_results = requests.request("POST", url, headers=headers, data=payload)
+        search_results = make_request(url, headers, payload)
         results = search_results.json()
 
         if 'statusCode' in results:
