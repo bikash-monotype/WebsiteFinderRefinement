@@ -332,13 +332,6 @@ if submit_button:
         export_df.to_excel(os.path.join(final_results_directory, 'invalid_non_working_domains.xlsx'), index=False, header=True)
 
         export_df = pd.DataFrame({
-            'Domains': response['final_valid_working_domains_dict'].keys(),
-            'Reason': response['final_valid_working_domains_dict'].values()
-        })
-
-        export_df.to_excel(os.path.join(final_results_directory, 'final_valid_working_domains.xlsx'), index=False, header=True)
-
-        export_df = pd.DataFrame({
             'Domains': response['final_invalid_non_working_domains_dict'].keys(),
             'Reason': response['final_invalid_non_working_domains_dict'].values()
         })

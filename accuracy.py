@@ -84,13 +84,6 @@ if uploaded_file is not None and company_name is not None:
         export_df.to_excel(os.path.join(final_results_directory, 'invalid_gtd.xlsx'), index=False, header=True)
 
         export_df = pd.DataFrame({
-            'Domains': response['final_valid_working_domains_dict'].keys(),
-            'Reason': response['final_valid_working_domains_dict'].values()
-        })
-
-        export_df.to_excel(os.path.join(final_results_directory, 'final_valid_working_domains.xlsx'), index=False, header=True)
-
-        export_df = pd.DataFrame({
             'Domains': response['final_invalid_non_working_domains_dict'].keys(),
             'Reason': response['final_invalid_non_working_domains_dict'].values()
         })
@@ -116,13 +109,13 @@ if uploaded_file is not None and company_name is not None:
 
         endtime = datetime.now() - start_time
 
-        common_values = set(valid_gtd).intersection(response['final_valid_working_domains_dict'].keys())
+        common_values = set(valid_gtd).intersection(response['final_valid_working_domains'])
         common_values = list(common_values)
 
-        missing_values_in_gtd = set(valid_gtd).difference(response['final_valid_working_domains_dict'].keys())
+        missing_values_in_gtd = set(valid_gtd).difference(response['final_valid_working_domains'])
         missing_values_in_gtd = list(missing_values_in_gtd)
 
-        new_values_in_valid_output = set(response['final_valid_working_domains_dict'].keys()).difference(valid_gtd)
+        new_values_in_valid_output = set(response['final_valid_working_domains']).difference(valid_gtd)
         new_values_in_valid_output = list(new_values_in_valid_output)
 
         accuracy = ((len(common_values) + len(new_values_in_valid_output)) / (len(valid_gtd) + len(new_values_in_valid_output))) * 100
@@ -135,7 +128,7 @@ if uploaded_file is not None and company_name is not None:
             'Valid GTD': [len(valid_gtd)],
             "Invalid GTD":[len(list(response2['invalid_non_working_domains'].keys()))],
             'AgentsOutput': [len(agentsOutput)],
-            'Valid AgentsOutput': [len(list(response['final_valid_working_domains_dict'].keys()))],
+            'Valid AgentsOutput': [len(list(response['final_valid_working_domains']))],
             'Common Values': [len(common_values)],
             'Missing Values from GTD':[len(missing_values_in_gtd)],
             'New Values in Valid Output':[len(new_values_in_valid_output)],
@@ -152,7 +145,7 @@ if uploaded_file is not None and company_name is not None:
         valid_gtd = pad_list(valid_gtd, max_length)
         invalid_gtd = pad_list(list(response2['invalid_non_working_domains'].keys()), max_length)
         agentsOutput = pad_list(agentsOutput, max_length)
-        valid_agentsOutput = pad_list(list(response['final_valid_working_domains_dict'].keys()), max_length)
+        valid_agentsOutput = pad_list(list(response['final_valid_working_domains']), max_length)
         common_values = pad_list(common_values, max_length)
         missing_values_in_gtd = pad_list(missing_values_in_gtd, max_length)
         new_values_in_valid_output = pad_list(new_values_in_valid_output, max_length)

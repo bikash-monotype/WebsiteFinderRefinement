@@ -81,42 +81,34 @@ def get_scrapegraph_config():
 
 # this function will be used to detect redirection and not reachable domains.
 def is_working_domain(url, log_file_paths):
-    max_retries = 3
     valid_domain = True
     reason = ''
 
-    for attempt in range(max_retries):
-        with sync_playwright() as p:
-            try:
-                browser = p.chromium.launch(headless=False, args=['--disable-http2'])
-                page = browser.new_page()
-                page.goto(url, timeout=120000)
-                
-                page.wait_for_load_state('load')
-                time.sleep(10)
+    with sync_playwright() as p:
+        try:
+            browser = p.chromium.launch(headless=False, args=['--disable-http2'])
+            page = browser.new_page()
+            page.goto(url)
 
-                if extract_domain_name(url) != extract_domain_name(page.url):
-                    valid_domain = False
-                    reason = 'Redirection.'
-                break
-            except PlaywrightTimeoutError as te:
-                with open(log_file_paths['log'], 'a') as f:
-                    f.write(f"Timeout error processing {url} on attempt {attempt + 1}: {te}")
-                print(f"Timeout error processing {url} on attempt {attempt + 1}: {te}")
-                if attempt < max_retries - 1:
-                    time.sleep(2)
-                else:
-                    valid_domain = False
-                    reason = f"Timeout error processing url {url}"
-            except Exception as e:
-                with open(log_file_paths['log'], 'a') as f:
-                    f.write(f"Error processing {url}: {e}")
-                print(f"Error processing {url}: {e}")
+            if extract_domain_name(url) != extract_domain_name(page.url):
                 valid_domain = False
-                reason = f"Error processing {url}: {e}"
-            finally:
-                if page is not None:
-                    page.close()
+                reason = 'Redirection.'
+        except PlaywrightTimeoutError as te:
+            with open(log_file_paths['log'], 'a') as f:
+                f.write(f"Timeout error processing {url}: {te}")
+            print(f"Timeout error processing {url}: {te}")
+            valid_domain = False
+            reason = f"Timeout error processing url {url}" 
+        except Exception as e:
+            with open(log_file_paths['log'], 'a') as f:
+                f.write(f"Error processing {url}: {e}")
+            print(f"Error processing {url}: {e}")
+            valid_domain = False
+            reason = f"Error processing {url}: {e}"
+        finally:
+            if page is not None:
+                page.close()
+
     return {
         'is_valid': valid_domain,
         'reason': reason

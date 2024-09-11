@@ -203,18 +203,10 @@ def validate_domains(domains, main_company, log_file_path):
     total_completion_tokens2 = 0
     total_serper_credits = 0
 
-    response = validate_working_domains(domains, log_file_path)
-
-    valid_working_domains = response['valid_working_domains']
-    invalid_non_working_domains = response['invalid_non_working_domains']
-    total_prompt_tokens += response['total_prompt_tokens']
-    total_completion_tokens += response['total_completion_tokens']
-    total_cost_USD += response['total_cost_USD']
-
     st.write('###### Remove incorrect domains')
 
     progress_bar = st.progress(0)
-    total_domains = len(valid_working_domains)
+    total_domains = len(domains)
     progress_step = 1 / total_domains
 
     validate_single_correct_domains_with_log = partial(validate_single_correct_domains, log_file_path, main_company)
@@ -226,7 +218,7 @@ def validate_domains(domains, main_company, log_file_path):
 
     with multiprocessing.Pool(processes=20) as pool:
         results = []
-        for i, result in enumerate(pool.imap(partial(process_worker_function, serialized_function), valid_working_domains), 1):
+        for i, result in enumerate(pool.imap(partial(process_worker_function, serialized_function), domains), 1):
             results.append(result)
             progress_bar.progress(min((i + 1) * progress_step, 1.0))
 
@@ -244,11 +236,21 @@ def validate_domains(domains, main_company, log_file_path):
         total_completion_tokens2 += res['llm_usage']['completion_tokens']
         total_serper_credits += res['serper_credits']
 
+    st.write('###### Check for redirection, unreachable and available for sale domains')
+
+    response = validate_working_domains(list(valid_working_domains_dict.keys()), log_file_path)
+
+    valid_working_domains = response['valid_working_domains']
+    invalid_non_working_domains = response['invalid_non_working_domains']
+    total_prompt_tokens += response['total_prompt_tokens']
+    total_completion_tokens += response['total_completion_tokens']
+    total_cost_USD += response['total_cost_USD']
+
     total_cost_USD += calculate_openai_costs(total_prompt_tokens2, total_completion_tokens2)
 
     return {
         'invalid_non_working_domains': invalid_non_working_domains,
-        'final_valid_working_domains_dict': valid_working_domains_dict,
+        'final_valid_working_domains': valid_working_domains,
         'final_invalid_non_working_domains_dict': invalid_non_working_domains_dict,
         'total_prompt_tokens': total_prompt_tokens + total_prompt_tokens2,
         'total_completion_tokens': total_completion_tokens + total_completion_tokens2,
