@@ -208,6 +208,3 @@ def get_all_links(url, log_file_path):
                 if page is not None:
                     page.close()
     return links
-
-
-print(extract_domain_name('https://rslt-manager.userzoom.com'))
