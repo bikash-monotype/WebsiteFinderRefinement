@@ -90,10 +90,7 @@ def is_working_domain(url, log_file_paths):
             try:
                 browser = p.chromium.launch(headless=False, args=['--disable-http2'])
                 page = browser.new_page()
-                page.goto(url, timeout=120000)
-                
-                page.wait_for_load_state('load')
-                time.sleep(10)
+                page.goto(url)
 
                 if extract_domain_name(url) != extract_domain_name(page.url):
                     valid_domain = False
