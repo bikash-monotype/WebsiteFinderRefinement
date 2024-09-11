@@ -112,13 +112,28 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
 
             {search_results}
 
-            Determine if {domain} is related to {main_company} as an official domain, brand, sub-brand, entity, acquisition, or a significant partnership. 
-            Focus exclusively on the information relevant to domain ownership and company affiliations. Be meticulous in validating the source of each piece of data. If no definitive information is available, specify 'N/A'. Incorrect or speculative entries will result in penalties.
-            It is critical to cite the exact source that confirms the nature of the relationship. Ensure that all responses adhere to the expected output format to avoid penalties.
+            Determine if the domain "{domain}" is officially associated with "{main_company}" through any of the following relationships:
+
+            1. Official domain ownership
+            2. Brand or sub-brand association
+            3. Acquisition or partnership
+
+            Evaluate the evidence in the search results carefully. You can use both exact and partial matches, but focus on identifying **strong, clear patterns of association** between the domain and the main company. Consider the context, relationships mentioned, and other relevant information provided in the results. 
+
+            If a valid relationship is found, return 'Yes' and explain the type of association along with the source from the search results (title, link, or snippet). If no association is found, return 'No' with the reason "No relevant information found in search results."
+
+            Be sure to only use the information provided in the search results for your answer. Avoid speculative or weak conclusions unless there is clear evidence to support the relationship.
+
+            Expected output format:
+            ['{domain}', 'Yes/No', 'Evidence']
+
+            **Scoring:**
+            - **Correct output:** +1 point (when the relationship is accurately identified as 'Yes' or 'No' based on strong evidence)
+            - **Incorrect output:** -1 point (for incorrect or speculative answers, especially if a relationship is assumed without clear evidence or if valid relationships are missed)
             """
         ),
         agent=domain_company_validation_researcher,
-        expected_output="['{domain}', 'Yes/No', 'Source URL']"
+        expected_output="['{domain}', 'Yes/No', 'Evidence']"
     )
 
     validation_crew = Crew(
