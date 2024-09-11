@@ -77,6 +77,13 @@ if uploaded_file is not None and company_name is not None:
         export_df.to_excel(os.path.join(final_results_directory, 'invalid_non_working_domains.xlsx'), index=False, header=True)
 
         export_df = pd.DataFrame({
+            'Domains': response2['invalid_non_working_domains'].keys(),
+            'Reason': response2['invalid_non_working_domains'].values()
+        })
+
+        export_df.to_excel(os.path.join(final_results_directory, 'invalid_gtd.xlsx'), index=False, header=True)
+
+        export_df = pd.DataFrame({
             'Domains': response['final_valid_working_domains_dict'].keys(),
             'Reason': response['final_valid_working_domains_dict'].values()
         })
@@ -122,8 +129,28 @@ if uploaded_file is not None and company_name is not None:
 
         max_length = max(len(gtd), len(agentsOutput), len(new_values_in_valid_output), len(valid_gtd), len(common_values))
 
+        res_data = {
+            "Company Name": [f"{company_name}"],
+            'GTD': [len(gtd)],
+            'Valid GTD': [len(valid_gtd)],
+            "Invalid GTD":[len(list(response2['invalid_non_working_domains'].keys()))],
+            'AgentsOutput': [len(agentsOutput)],
+            'Valid AgentsOutput': [len(list(response['final_valid_working_domains_dict'].keys()))],
+            'Common Values': [len(common_values)],
+            'Missing Values from GTD':[len(missing_values_in_gtd)],
+            'New Values in Valid Output':[len(new_values_in_valid_output)],
+            'Accuracy': [accuracy]
+        }
+
+        res_df = pd.DataFrame(res_data)
+
+        acc_df = pd.read_excel("validation/Accuracy.xlsx",engine = "openpyxl")
+        acc_df = pd.concat([acc_df,res_df])
+        acc_df.to_excel("validation/Accuracy.xlsx", index=False, engine="openpyxl")    
+
         gtd = pad_list(gtd, max_length)
         valid_gtd = pad_list(valid_gtd, max_length)
+        invalid_gtd = pad_list(list(response2['invalid_non_working_domains'].keys()), max_length)
         agentsOutput = pad_list(agentsOutput, max_length)
         valid_agentsOutput = pad_list(list(response['final_valid_working_domains_dict'].keys()), max_length)
         common_values = pad_list(common_values, max_length)
@@ -134,6 +161,7 @@ if uploaded_file is not None and company_name is not None:
         export_df = pd.DataFrame({
             'GTD': gtd,
             'Valid GTD': valid_gtd,
+            'Invalid GTD': invalid_gtd,
             'AgentsOutput': agentsOutput,
             'Valid AgentsOutput': valid_agentsOutput,
             'Common Values': common_values,
