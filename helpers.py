@@ -123,8 +123,8 @@ def is_working_domain(url, log_file_paths):
     }
 
 def extract_domain_name(url):
-    if not url.startswith(('http://', 'https://')):
-        return url
+    if not url.startswith('http://') and not url.startswith('https://'):
+        url = f'https://{url}'
     
     parsed_url = urllib.parse.urlparse(url)
     extracted = tldextract.extract(parsed_url.netloc)
@@ -208,3 +208,6 @@ def get_all_links(url, log_file_path):
                 if page is not None:
                     page.close()
     return links
+
+
+print(extract_domain_name('https://rslt-manager.userzoom.com'))
