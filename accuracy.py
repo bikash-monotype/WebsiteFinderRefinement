@@ -24,7 +24,7 @@ if uploaded_file is not None and company_name is not None:
         agentsOutput = df['AgentsOutput'].tolist()
 
         gtd = [value for value in gtd if not pd.isna(value)]
-        agentsOutput = [value for value in agentsOutput if not pd.isna(value)]
+        agentsOutput = [value for value in agentsOutput if not pd.isna(value) and isinstance(value, str) and value != "."]
 
         gtd = [extract_domain_name(url) for url in gtd]
         gtd = set(gtd)
