@@ -49,7 +49,7 @@ domain_company_validation_researcher = Agent(
 
 def validate_working_single_domain(log_file_path, domain):
     try :
-        is_valid_working_domain = is_working_domain(domain)
+        is_valid_working_domain = is_working_domain(domain, log_file_path)
 
         if is_valid_working_domain['is_valid'] is False:
             return {
