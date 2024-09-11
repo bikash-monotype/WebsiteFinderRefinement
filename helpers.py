@@ -79,9 +79,11 @@ def get_scrapegraph_config():
         "headless": False,
     }
 
-def is_valid_working_domain(url, log_file_paths):
+# this function will be used to detect redirection and not reachable domains.
+def is_working_domain(url, log_file_paths):
     max_retries = 3
     valid_domain = True
+    reason = ''
 
     for attempt in range(max_retries):
         with sync_playwright() as p:
@@ -93,9 +95,9 @@ def is_valid_working_domain(url, log_file_paths):
                 page.wait_for_load_state('load')
                 time.sleep(10)
 
-                if url != page.url:
+                if extract_domain_name(url) != extract_domain_name(page.url):
                     valid_domain = False
-
+                    reason = 'Redirection.'
                 break
             except PlaywrightTimeoutError as te:
                 with open(log_file_paths['log'], 'a') as f:
@@ -105,15 +107,20 @@ def is_valid_working_domain(url, log_file_paths):
                     time.sleep(2)
                 else:
                     valid_domain = False
+                    reason = f"Timeout error processing url {url}"
             except Exception as e:
                 with open(log_file_paths['log'], 'a') as f:
                     f.write(f"Error processing {url}: {e}")
                 print(f"Error processing {url}: {e}")
                 valid_domain = False
+                reason = f"Error processing {url}: {e}"
             finally:
                 if page is not None:
                     page.close()
-    return valid_domain
+    return {
+        'is_valid': valid_domain,
+        'reason': reason
+    }
 
 def extract_domain_name(url):
     if not url.startswith(('http://', 'https://')):

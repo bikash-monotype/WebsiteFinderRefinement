@@ -8,7 +8,7 @@ import multiprocessing
 import streamlit as st
 from functools import partial
 import dill
-from helpers import process_worker_function, extract_domain_name
+from helpers import process_worker_function, extract_domain_name, is_working_domain
 from tools import search_multiple_page
 import json_repair
 from helpers import calculate_openai_costs
@@ -49,9 +49,19 @@ domain_company_validation_researcher = Agent(
 
 def validate_working_single_domain(log_file_path, domain):
     try :
+        is_valid_working_domain = is_working_domain(domain)
+
+        if is_valid_working_domain['is_valid'] is False:
+            return {
+                'domain': domain,
+                'isVisitable': is_valid_working_domain['is_valid'],
+                'reason': is_valid_working_domain['reason'],
+                'exec_info': None
+            }
+
         prompt = (
-            "Check if the site is visitable. If the URL is redirected and the domain changes from the original '{domain}', mark it as 'No.' "
-            "If the domain remains the same, mark it as 'Yes.' Additionally, if the domain is available for sale, mark it as 'No' and provide a reason. "
+            "Check if the site is visitable. If the domain is available for sale, mark it as 'No' and provide a reason. "
+            "Also verify if the site is properly reachable (e.g., no errors like 403/404). "
             "Sample output format: {'isVisitable': 'Yes/No', 'reason': 'Explanation if No'}."
         )
         
