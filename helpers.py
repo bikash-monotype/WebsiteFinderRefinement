@@ -20,6 +20,13 @@ social_media_domains = [
     'tiktok.com', 'snapchat.com', 'whatsapp.com', 'quora.com', 'google.com', 'github.com', 'apple.com', 'vimeo.com', 'youtu.be', 'cloudflare.net', 'goo.gl', 'mozilla.org', 'maps.app.goo.gl'
 ]
 
+social_media_domain_main_part = [
+    'facebook', 'twitter', 'instagram', 'cookiepedia', 'fonts', 'jwt', 'google-analytics', 'adobe',
+    'threads', 'linkedin', 'pinterest', 'youtube', 'onetrust', 'amazon', 'reddit', 'wordpress', 'adobe',
+    'tiktok', 'snapchat', 'whatsapp', 'quora', 'google', 'github', 'apple', 'vimeo', 'youtu', 'cloudflare', 'goo', 'mozilla', 'maps',
+    'example', 'oauth', 'sec', 'researchgate', 'gov', 'microsoft', 'w3', 'wikipedia', 'mozilla', 'qq', 'you', 'jquery', 'shopifycdn', 'shopify', 'fontawesome', 'jsdelivr',
+]
+
 @retry(stop=stop_after_attempt(3), wait=wait_fixed(2), retry=(lambda e: isinstance(e, ConnectTimeout)))
 def make_request(url, headers, payload):
     return requests.request("POST", url, headers=headers, data=payload)
@@ -29,6 +36,9 @@ def process_worker_function(serialized_func, row):
     return func(row)
 
 def extract_main_part(url):
+    if not url.startswith('http://') and not url.startswith('https://'):
+        url = f'https://{url}'
+
     parsed_url = urllib.parse.urlparse(url)
     extracted = tldextract.extract(parsed_url.netloc)
     domain_name = extracted.domain
@@ -146,6 +156,7 @@ def create_result_directory(output_folder, main_directory):
     return {
         'log': os.path.join(new_folder_path, "log.txt"),
         'llm': os.path.join(new_folder_path, "llm.txt"),
+        'crew_ai': os.path.join(new_folder_path, "crew_ai.txt"),
         'serper': os.path.join(new_folder_path, "serper.txt"),
     }
 

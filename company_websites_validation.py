@@ -32,21 +32,6 @@ model = AzureChatOpenAI(
 
 graph_config = get_scrapegraph_config()
 
-domain_company_validation_researcher = Agent(
-    role='Domain Relationship Analyst',
-    goal='Validate the relationship between {domain} and {main_company}, assessing whether the domain is officially affiliated with the company. This includes investigating domain ownership, brand association, legal or business affiliations, and any partnerships or acquisitions involving the domain and the company.',
-    verbose=True,
-    llm=model,
-    model_name=os.getenv('AZURE_OPENAI_MODEL_NAME'),
-    backstory=(
-        """
-        As an expert in domain ownership and corporate affiliations, you specialize in identifying the connections between domains and companies. You excel at conducting thorough research using official sources like WHOIS records, company websites, press releases, and legal documents to verify domain ownership and affiliations.
-        Your findings are grounded in verifiable data, ensuring that each conclusion about the relationship between a domain and a company is backed by solid, authoritative evidence. You prioritize clarity and accuracy, providing stakeholders with trustworthy information on domain affiliations.
-        In your role, you document the findings in a manner that is easy to understand and verify, making sure that all relationships are clearly defined and backed by strong evidence.
-        """
-    )
-)
-
 def validate_working_single_domain(log_file_path, domain):
     try :
         is_valid_working_domain = is_working_domain(domain, log_file_path)
@@ -97,13 +82,28 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
 
     if len(search_results['all_results']) == 0:
         return {
-            'results': [domain, 'No', 'No search results'],
+            'results': [domain, 'No'],
             'llm_usage': {
                 'prompt_tokens': 0,
                 'completion_tokens': 0
             },
             'serper_credits': search_results['serper_credits']
         }
+
+    domain_company_validation_researcher = Agent(
+        role='Domain Relationship Analyst',
+        goal='Validate the relationship between {domain} and {main_company}, assessing whether the domain is officially affiliated with the company. This includes investigating domain ownership, brand association, legal or business affiliations, and any partnerships or acquisitions involving the domain and the company.',
+        verbose=True,
+        llm=model,
+        model_name=os.getenv('AZURE_OPENAI_MODEL_NAME'),
+        backstory=(
+            """
+            As an expert in domain ownership and corporate affiliations, you specialize in identifying the connections between domains and companies. You excel at conducting thorough research using official sources like WHOIS records, company websites, press releases, and legal documents to verify domain ownership and affiliations.
+            Your findings are grounded in verifiable data, ensuring that each conclusion about the relationship between a domain and a company is backed by solid, authoritative evidence. You prioritize clarity and accuracy, providing stakeholders with trustworthy information on domain affiliations.
+            In your role, you document the findings in a manner that is easy to understand and verify, making sure that all relationships are clearly defined and backed by strong evidence.
+            """
+        )
+    )
 
     domain_company_validation_task = Task(
         description=(
@@ -112,20 +112,39 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
 
             {search_results}
 
-            Determine if {domain} is related to {main_company} as an official domain, brand, sub-brand, entity, acquisition, or a significant partnership. 
-            Focus exclusively on the information relevant to domain ownership and company affiliations. Be meticulous in validating the source of each piece of data. If no definitive information is available, specify 'N/A'. Incorrect or speculative entries will result in penalties.
-            It is critical to cite the exact source that confirms the nature of the relationship. Ensure that all responses adhere to the expected output format to avoid penalties.
+            Determine if the domain "{domain}" is associated with "{main_company}" through one of the following:
+
+            1. Official domain ownership
+            2. Entity association
+            3. Brand or sub-brand
+            4. Acquisition or partnership
+
+            Focus on clear evidence of association, using both exact and partial matches. Consider the context and relationships described.
+
+            **Note:** If the domain is **for sale**, return 'No'
+
+            If the relationship is valid, return 'Yes'. If not, return 'No'
+
+            Only use information from the search results. Avoid assumptions.
+
+            Output format:
+            ['{domain}', 'Yes/No']
+
+            **Scoring:**
+            - +1 for correct output (based on evidence)
+            - -1 for incorrect or speculative output
             """
         ),
         agent=domain_company_validation_researcher,
-        expected_output="['{domain}', 'Yes/No', 'Source URL']"
+        expected_output="['{domain}', 'Yes/No']"
     )
 
     validation_crew = Crew(
         agents=[domain_company_validation_researcher],
         tasks=[domain_company_validation_task],
         process=Process.sequential,
-        verbose=True
+        verbose=True,
+        cache=False
     )
 
     results = validation_crew.kickoff({
@@ -134,8 +153,12 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
         'search_results': search_results['all_results']
     })
 
+    llm_usage = results.token_usage
     results = json_repair.loads(results.raw)
-    llm_usage = validation_crew.calculate_usage_metrics()
+
+    with open(log_file_paths['crew_ai'], 'a') as f:
+        f.write("\n")
+        f.write(f"{domain} validation" + str(llm_usage))
 
     return {
         'results': results,
@@ -213,8 +236,8 @@ def validate_domains(domains, main_company, log_file_path):
 
     serialized_function = dill.dumps(validate_single_correct_domains_with_log)
 
-    valid_working_domains_dict = {}
-    invalid_non_working_domains_dict = {}
+    valid_working_domains = set()
+    invalid_non_working_domains = set()
 
     with multiprocessing.Pool(processes=20) as pool:
         results = []
@@ -223,11 +246,11 @@ def validate_domains(domains, main_company, log_file_path):
             progress_bar.progress(min((i + 1) * progress_step, 1.0))
 
     for res in results:
-        if len(res['results']) >= 3:
+        if len(res['results']) >= 2:
             if res['results'][1] != 'Yes':
-                invalid_non_working_domains_dict[res['results'][0]] = res['results'][2]
+                invalid_non_working_domains.add(res['results'][0])
             else:
-                valid_working_domains_dict[res['results'][0]] = res['results'][2]
+                valid_working_domains.add(res['results'][0])
         else:
             with open(log_file_path['log'], 'a') as f:
                 f.write(f"Unexpected format in results: {res['results']}")
@@ -236,22 +259,38 @@ def validate_domains(domains, main_company, log_file_path):
         total_completion_tokens2 += res['llm_usage']['completion_tokens']
         total_serper_credits += res['serper_credits']
 
-    st.write('###### Check for redirection, unreachable and available for sale domains')
-
-    response = validate_working_domains(list(valid_working_domains_dict.keys()), log_file_path)
-
-    valid_working_domains = response['valid_working_domains']
-    invalid_non_working_domains = response['invalid_non_working_domains']
-    total_prompt_tokens += response['total_prompt_tokens']
-    total_completion_tokens += response['total_completion_tokens']
-    total_cost_USD += response['total_cost_USD']
-
     total_cost_USD += calculate_openai_costs(total_prompt_tokens2, total_completion_tokens2)
 
+    with open(log_file_path['llm'], 'a') as f:
+        f.write('Remove incorrect domains')
+        f.write(f"Total prompt tokens: {total_prompt_tokens2}\n")
+        f.write(f"Total completion tokens: {total_completion_tokens2}\n")
+        f.write(f"Total cost: {total_cost_USD}\n")
+
+    with open(log_file_path['serper'], 'a') as f:
+        f.write('Remove incorrect domains')
+        f.write(f"Total Credits: {total_serper_credits}\n")
+
+    # st.write('###### Check for redirection, unreachable and available for sale domains')
+
+    # response = validate_working_domains(list(valid_working_domains_dict.keys()), log_file_path)
+
+    # valid_working_domains = response['valid_working_domains']
+    # invalid_non_working_domains = response['invalid_non_working_domains']
+    # total_prompt_tokens += response['total_prompt_tokens']
+    # total_completion_tokens += response['total_completion_tokens']
+    # total_cost_USD += response['total_cost_USD']
+
+    # with open(log_file_path['llm'], 'a') as f:
+    #     f.write('Check for redirection, unreachable and available for sale domains')
+    #     f.write(f"Total prompt tokens: {response['total_prompt_tokens']}\n")
+    #     f.write(f"Total completion tokens: {response['total_completion_tokens']}\n")
+    #     f.write(f"Total cost: {response['total_cost_USD']}\n")
+
     return {
-        'invalid_non_working_domains': invalid_non_working_domains,
-        'final_valid_working_domains': valid_working_domains,
-        'final_invalid_non_working_domains_dict': invalid_non_working_domains_dict,
+        # 'invalid_non_working_domains': invalid_non_working_domains,
+        'final_valid_working_domains': list(valid_working_domains),
+        'final_invalid_non_working_domains': list(invalid_non_working_domains),
         'total_prompt_tokens': total_prompt_tokens + total_prompt_tokens2,
         'total_completion_tokens': total_completion_tokens + total_completion_tokens2,
         'total_cost_USD': total_cost_USD,

@@ -23,22 +23,6 @@ default_llm = AzureChatOpenAI(
     temperature=0
 )
 
-expert_website_researcher_agent_1 = Agent(
-    role="Expert Website Researcher",
-    goal="Accurately identify the main website of the company {company_name} , which is a part of {main_company}.",
-    verbose=True,
-    llm=default_llm,
-    model_name=os.getenv('AZURE_OPENAI_MODEL_NAME'),
-    allow_delegation=False,
-    backstory="""
-        You have been a part of {main_company} for many years and have a deep understanding of the company's operations and online presence.
-        As a seasoned investigator in the digital realm, you are a skilled web researcher capable of finding accurate company websites using search engines and verifying the information.
-        With years of being with {company_name}, you are well known about the ins and outs of this company.
-        You know all the websites with copyright same as main website of these.
-        You also are expert in google searching and using sites like crunchbase, and Pitch book, etc to find the company details and get the website.
-        You are meticulus and organized, and you only provide correct and precise data i.e. websites that you have identified correctly.""",
-)
-
 def process_single_website(website, log_file_path):
     result = get_copyright(website, log_file_path)
     return {
@@ -101,6 +85,22 @@ def process_subsidiary(subsidiary, main_company, sample_expert_website_researche
 
     search_results = json.dumps(search_results1['all_results'] + search_results2['all_results'] + search_results3['all_results'])
 
+    expert_website_researcher_agent_1 = Agent(
+        role="Expert Website Researcher",
+        goal="Accurately identify the main website of the company {company_name} , which is a part of {main_company}.",
+        verbose=True,
+        llm=default_llm,
+        model_name=os.getenv('AZURE_OPENAI_MODEL_NAME'),
+        allow_delegation=False,
+        backstory="""
+            You have been a part of {main_company} for many years and have a deep understanding of the company's operations and online presence.
+            As a seasoned investigator in the digital realm, you are a skilled web researcher capable of finding accurate company websites using search engines and verifying the information.
+            With years of being with {company_name}, you are well known about the ins and outs of this company.
+            You know all the websites with copyright same as main website of these.
+            You also are expert in google searching and using sites like crunchbase, and Pitch book, etc to find the company details and get the website.
+            You are meticulus and organized, and you only provide correct and precise data i.e. websites that you have identified correctly.""",
+    )
+
     expert_website_researcher_task_1 = Task(
         description=(
             """
@@ -137,9 +137,12 @@ def process_subsidiary(subsidiary, main_company, sample_expert_website_researche
     )
     
     results = expert_website_researcher_crew_1.kickoff(inputs={"company_name": subsidiary, "main_company": main_company, "search_results": search_results, "sample_expert_website_researcher_output": sample_expert_website_researcher_output})
+    llm_usage = results.token_usage
     results = json_repair.loads(results.raw)
 
-    llm_usage = expert_website_researcher_crew_1.calculate_usage_metrics()
+    with open(log_file_paths['crew_ai'], 'a') as f:
+        f.write("\n")
+        f.write(f"{subsidiary} official website finder" + str(llm_usage))
     
     return {
         'websites': results,

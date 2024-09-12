@@ -255,12 +255,14 @@ if submit_button:
 
         copyrights = process_website_and_get_copyrights(unique_urls, log_file_paths)
 
+        total_cost_USD = copyrights['llm_usage']['total_cost_USD']
+
         with open(log_file_paths['llm'], 'a') as f:
             f.write("\n\n")
             f.write(f"Finding copyright for the official websites:\n")
-            f.write(f"Total Prompt Tokens: {websites['llm_usage']['prompt_tokens']}\n")
-            f.write(f"Total Completion Tokens: {websites['llm_usage']['completion_tokens']}\n")
-            f.write(f"Total Cost in USD: {total_cost_USD}\n")
+            f.write(f"Total Prompt Tokens: {copyrights['llm_usage']['prompt_tokens']}\n")
+            f.write(f"Total Completion Tokens: {copyrights['llm_usage']['completion_tokens']}\n")
+            f.write(f"Total Cost in USD: {copyrights['llm_usage']['total_cost_USD']}\n")
 
         whole_process_prompt_tokens += websites['llm_usage']['prompt_tokens']
         whole_process_completion_tokens += websites['llm_usage']['completion_tokens']
