@@ -92,6 +92,36 @@ if submit_button:
             except ValueError as e:
                 urls = []
 
+        # st.write("###### No url found for the given company")
+
+        st.write("###### Fetching links for finding company structures")
+
+        all_links = get_links_for_company_structures_for_private_company(company_name, log_file_paths['log'])
+
+        total_cost_USD = calculate_openai_costs(all_links['llm_usage']['prompt_tokens'], all_links['llm_usage']['completion_tokens'])
+
+        whole_process_prompt_tokens += all_links['llm_usage']['prompt_tokens']
+        whole_process_completion_tokens += all_links['llm_usage']['completion_tokens']
+        whole_process_llm_costs += total_cost_USD
+        whole_process_serper_credits += all_links['serper_credits']
+
+        with open(log_file_paths['llm'], 'a') as f:
+            f.write(f"\n\n")
+            f.write(f"Finding links for subsidiaries for private subsidiaries:\n")
+            f.write(f"Total Prompt Tokens: {all_links['llm_usage']['prompt_tokens']}\n")
+            f.write(f"Total Completion Tokens: {all_links['llm_usage']['completion_tokens']}\n")
+            f.write(f"Total Cost in USD: {total_cost_USD}\n")
+
+        with open(log_file_paths['serper'], 'a') as f:
+            f.write("\n\n")
+            f.write(f"Finding links for subsidiaries for private subsidiaries:\n")
+            f.write(f"Total Credits: {all_links['serper_credits']}\n")
+
+        if all_links['links'] is not None:
+            urls.extend(all_links['links'])
+           
+        urls = list(set(urls))
+
         if len(urls) == 0:
             st.write("###### No url found for the given company")
 

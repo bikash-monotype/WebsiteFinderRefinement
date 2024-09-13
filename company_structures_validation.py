@@ -51,6 +51,13 @@ def process_single_company_structure_validation(main_company, subsidiary, log_fi
             Determine if {subsidiary} is related to {main_company} as a subsidiary, brand, sub-brand, acquisition, trust, entity, global operation, charitable organization, or holds a significant partnership (>50% ownership).
             Focus exclusively on the information above. Be meticulous in validating the source of each piece of data. If no definitive information is available, specify 'N/A'. Incorrect or speculative entries will result in penalties.
             It is critical to cite the exact source that confirms the nature of the relationship. Ensure that all responses adhere to the expected output format to avoid penalties.
+
+            Sample Output:
+            ['{subsidiary}', 'Yes/No', 'Source URL']
+
+            Important notes:
+            - Do not provide any other texts or information in the output as it will not work with the further process.
+            - Do not include ``` or any other such characters in the output.
             """
         ),
         agent=company_structures_validation_researcher,
@@ -72,6 +79,13 @@ def process_single_company_structure_validation(main_company, subsidiary, log_fi
             Determine if {subsidiary} is related to {main_company} as a subsidiary, brand, sub-brand, acquisition, trust, entity, global operation, charitable organization, or holds a significant partnership (>50% ownership).
             Focus exclusively on the information above. Be meticulous in validating the source of each piece of data. If no definitive information is available, specify 'N/A'. Incorrect or speculative entries will result in penalties.
             It is critical to cite the exact source that confirms the nature of the relationship. Ensure that all responses adhere to the expected output format to avoid penalties.
+
+            Sample Output:
+            ['{subsidiary}', 'Yes/No', 'Source URL']
+            
+            Important notes:
+            - Do not provide any other texts or information in the output as it will not work with the further process.
+            - Do not include ``` or any other such characters in the output.
         """
     )
 

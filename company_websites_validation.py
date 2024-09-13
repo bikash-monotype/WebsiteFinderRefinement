@@ -8,7 +8,7 @@ import multiprocessing
 import streamlit as st
 from functools import partial
 import dill
-from helpers import process_worker_function, extract_domain_name, is_working_domain
+from helpers import process_worker_function, extract_domain_name, is_working_domain, is_regional_domain_enhanced, translate_text
 from tools import search_multiple_page
 import json_repair
 from helpers import calculate_openai_costs, tokenize_text
@@ -78,17 +78,27 @@ def validate_working_single_domain(log_file_path, domain):
         return {'domain': domain, 'isVisitable': 'No', 'reason': 'Exception when validating domain using scrapegraph AI', 'exec_info': None}
     
 def validate_single_correct_domains(log_file_paths, main_company, domain):
+    total_prompt_tokens = 0
+    total_completion_tokens = 0
+
     search_results = search_multiple_page(f"site:{domain} a part of {main_company}?", 10, 1, log_file_path=log_file_paths['log'])
 
     if len(search_results['all_results']) == 0:
-        return {
-            'results': [domain, 'No'],
-            'llm_usage': {
-                'prompt_tokens': 0,
-                'completion_tokens': 0
-            },
-            'serper_credits': search_results['serper_credits']
-        }
+        country_specific_domain = is_regional_domain_enhanced(domain)
+
+        if country_specific_domain is True:
+            translate_search_string = translate_text(f"site:{domain} a part of {main_company}?")
+
+            search_results = search_multiple_page(translate_search_string['converted_text'], 10, 1, log_file_path=log_file_paths['log'])
+        else:
+            return {
+                'results': [domain, 'No'],
+                'llm_usage': {
+                    'prompt_tokens': 0,
+                    'completion_tokens': 0
+                },
+                'serper_credits': search_results['serper_credits']
+            }
 
     domain_company_validation_researcher = Agent(
         role='Domain Relationship Analyst',
@@ -195,8 +205,8 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
     """)
 
     llm_usage = {
-        'prompt_tokens': prompt_tokens,
-        'completion_tokens': completion_tokens
+        'prompt_tokens': total_prompt_tokens + prompt_tokens,
+        'completion_tokens': total_completion_tokens + completion_tokens
     }
 
     results = json_repair.loads(results.raw)

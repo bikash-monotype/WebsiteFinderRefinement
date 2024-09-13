@@ -12,6 +12,10 @@ import requests
 from requests.exceptions import ConnectTimeout
 from tenacity import retry, stop_after_attempt, wait_fixed
 import tiktoken
+import pycountry
+from langchain.prompts import PromptTemplate
+from langchain.chains import LLMChain
+import json_repair
 
 load_dotenv()
 
@@ -26,7 +30,16 @@ social_media_domain_main_part = [
     'threads', 'linkedin', 'pinterest', 'youtube', 'onetrust', 'amazon', 'reddit', 'wordpress', 'adobe',
     'tiktok', 'snapchat', 'whatsapp', 'quora', 'google', 'github', 'apple', 'vimeo', 'youtu', 'cloudflare', 'goo', 'mozilla', 'maps',
     'example', 'oauth', 'sec', 'researchgate', 'gov', 'microsoft', 'w3', 'wikipedia', 'mozilla', 'qq', 'you', 'jquery', 'shopifycdn', 'shopify', 'fontawesome', 'jsdelivr',
+    'myworkdayjobs', 'applytojob', 'device', 'site'
 ]
+
+llm = AzureChatOpenAI(
+    azure_endpoint=os.getenv('AZURE_OPENAI_ENDPOINT'),
+    openai_api_version=os.getenv('OPENAI_API_VERSION'),
+    api_key=os.getenv('AZURE_OPENAI_API_KEY'),
+    model=os.getenv('AZURE_OPENAI_DEPLOYMENT_NAME'),
+    temperature=0
+)
 
 @retry(stop=stop_after_attempt(3), wait=wait_fixed(2), retry=(lambda e: isinstance(e, ConnectTimeout)))
 def make_request(url, headers, payload):
@@ -147,6 +160,67 @@ def tokenize_text(text):
     tokens = encoding.encode(text)
 
     return len(tokens)
+
+def translate_text(text):
+    sample_json = {
+        'converted_text': 'Converted'
+    }
+    
+    template = """
+        You are a language model. 
+        Convert the given google search string according to it's country language.
+
+        Text: {input_text}
+
+        Sample Output Format:
+        {sample_json}
+
+        Important note: Please provide the output in the JSON format as shown above.
+    """
+
+    prompt = PromptTemplate(
+        input_variables=["input_text", "sample_json"],
+        template=template,
+    )
+
+    chain = LLMChain(llm=llm, prompt=prompt)
+
+    result = chain.run(input_text=text, sample_json=sample_json)
+
+    prompt_tokens = chain.llm.get_num_tokens(chain.prompt.format(input_text=text, sample_json=sample_json))
+    completion_tokens = chain.llm.get_num_tokens(result)
+
+    result = json_repair.loads(result)
+
+    return {
+        'converted_text': result['converted_text'],
+        'prompt_tokens': prompt_tokens,
+        'completion_tokens': completion_tokens,
+    }
+
+def is_regional_domain_enhanced(domain):
+    """
+    Determines if a domain is a regional (country-specific) domain,
+    excluding certain country codes treated as generic.
+
+    Args:
+        domain (str): The domain name to check (e.g., 'apple.com.tr').
+
+    Returns:
+        bool: True if the domain is regional, False otherwise.
+    """
+    extracted = tldextract.extract(domain)
+    suffix = extracted.suffix
+
+    if not suffix:
+        return False
+
+    parts = suffix.split('.')
+    last_part = parts[-1].lower()
+
+    country = pycountry.countries.get(alpha_2=last_part.upper())
+
+    return country is not None
 
 def create_result_directory(output_folder, main_directory):
     script_dir = os.path.dirname(os.path.abspath(__file__))
