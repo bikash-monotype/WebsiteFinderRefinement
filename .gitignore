@@ -6,4 +6,5 @@ final_results-old/
 venv/
 validation/
 validation_input/
-private
+private/
+Accuracy.xlsx
