@@ -8,12 +8,12 @@ import multiprocessing
 import streamlit as st
 from functools import partial
 import dill
-from helpers import process_worker_function, extract_domain_name, is_working_domain, is_regional_domain_enhanced, translate_text
+from helpers import process_worker_function, extract_domain_name, is_working_domain, is_regional_domain_enhanced, translate_text, chunk_list, extract_main_part, social_media_domain_main_part
 from tools import search_multiple_page
 import json_repair
 from helpers import calculate_openai_costs, tokenize_text
 import time
-
+import pandas as pd
 load_dotenv()
 
 os.environ['AZURE_OPENAI_ENDPOINT'] = os.getenv('AZURE_OPENAI_ENDPOINT')
@@ -291,6 +291,8 @@ def validate_working_domains(domains, log_file_path):
     }
 
 def validate_domains(domains, main_company, log_file_path):
+    domains = [value for value in domains if not pd.isna(value) and isinstance(value, str) and value != "." and extract_main_part(value) not in social_media_domain_main_part]
+
     total_prompt_tokens = 0
     total_completion_tokens = 0
     total_cost_USD = 0.0
@@ -312,11 +314,14 @@ def validate_domains(domains, main_company, log_file_path):
     valid_working_domains = set()
     invalid_non_working_domains = set()
 
+    chunk_size = 10
+    results = []
+
     with multiprocessing.Pool(processes=20) as pool:
-        results = []
-        for i, result in enumerate(pool.imap(partial(process_worker_function, serialized_function), domains), 1):
-            results.append(result)
-            progress_bar.progress(min((i + 1) * progress_step, 1.0))
+        for chunk in chunk_list(domains, chunk_size):
+            chunk_results = pool.map(partial(process_worker_function, serialized_function), chunk)
+            results.extend(chunk_results)
+            progress_bar.progress(min((len(results) + 1) * progress_step, 1.0))
 
     for res in results:
         if isinstance(res['results'], list) and len(res['results']) >= 2:

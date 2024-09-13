@@ -149,6 +149,10 @@ def is_working_domain(url, log_file_paths):
         'reason': reason
     }
 
+def chunk_list(lst, chunk_size):
+    for i in range(0, len(lst), chunk_size):
+        yield lst[i:i + chunk_size]
+
 def extract_domain_name(url):
     if not url.startswith('http://') and not url.startswith('https://'):
         url = f'https://{url}'
