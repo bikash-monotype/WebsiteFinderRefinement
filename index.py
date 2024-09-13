@@ -136,6 +136,11 @@ if submit_button:
             #         progress_bar.progress(min((i + 1) * progress_step, 1.0))
             # dont forget to add the results to the links and llm cost and serper credits
 
+        with open(log_file_paths['links'], 'a') as f:
+            f.write(f"\n\n")
+            f.write(f"All links for subsidiaries:\n")
+            f.write(f"All Links: {str(urls)}\n")
+
         st.write(f"###### Processing {len(urls)} URLs for finding subsidiaries")
 
         progress_bar = st.progress(0)
@@ -185,7 +190,24 @@ if submit_button:
         
         valid_subsidiaries = validate_company_structure(company_structure_set, company_name, log_file_paths)
 
-        filtered_agents_output_list = [item for item in valid_subsidiaries['correct_agentsOutputList'] if item is not None]
+        export_df = pd.DataFrame({
+            'AgentsOutput': valid_subsidiaries['agentsOutputList'],
+            'ValidAgentsOutput': valid_subsidiaries['correct_agentsOutputList'],
+            'ValidAgentsReference': valid_subsidiaries['correct_agentsOutputListReference'],
+            'ErrorAgentsOutput': valid_subsidiaries['error_agentsOutputList'],
+            'ErrorAgentsReference': valid_subsidiaries['error_agentsOutputListReference']
+        })
+
+        export_df['Accuracy'] = valid_subsidiaries['accuracy']
+        export_df['Error'] = valid_subsidiaries['error']
+
+        export_df.to_excel(os.path.join(final_results_directory, company_name.replace('/', '-') + '.xlsx'), index=False, header=True)
+
+        filtered_agents_output_list = {item for item in valid_subsidiaries['correct_agentsOutputList'] if item is not None}
+        filtered_agents_output_list.add(company_name)
+
+        filtered_agents_output_list = list(filtered_agents_output_list)
+
         st.markdown(f"<span style='color: green;'>####### {len(filtered_agents_output_list)} valid subsidiaries found.</span>", unsafe_allow_html=True)
 
         total_cost_USD = calculate_openai_costs(valid_subsidiaries['llm_usage']['prompt_tokens'], valid_subsidiaries['llm_usage']['completion_tokens'])
@@ -207,19 +229,6 @@ if submit_button:
         whole_process_llm_costs += total_cost_USD
 
         whole_process_serper_credits += valid_subsidiaries['serper_credits']
-
-        export_df = pd.DataFrame({
-            'AgentsOutput': valid_subsidiaries['agentsOutputList'],
-            'ValidAgentsOutput': valid_subsidiaries['correct_agentsOutputList'],
-            'ValidAgentsReference': valid_subsidiaries['correct_agentsOutputListReference'],
-            'ErrorAgentsOutput': valid_subsidiaries['error_agentsOutputList'],
-            'ErrorAgentsReference': valid_subsidiaries['error_agentsOutputListReference']
-        })
-
-        export_df['Accuracy'] = valid_subsidiaries['accuracy']
-        export_df['Error'] = valid_subsidiaries['error']
-
-        export_df.to_excel(os.path.join(final_results_directory, company_name.replace('/', '-') + '.xlsx'), index=False, header=True)
     
         st.write("###### Finding official websites for the subsidiaries")
         websites = get_official_websites(filtered_agents_output_list, company_name, log_file_paths)
@@ -327,18 +336,16 @@ if submit_button:
         response = validate_domains(combined_final_results, company_name, log_file_paths)
 
         export_df = pd.DataFrame({
-            'Domains': response['invalid_non_working_domains'].keys(),
-            'Reason': response['invalid_non_working_domains'].values()
-        })
-
-        export_df.to_excel(os.path.join(final_results_directory, 'invalid_non_working_domains.xlsx'), index=False, header=True)
-
-        export_df = pd.DataFrame({
-            'Domains': response['final_invalid_non_working_domains_dict'].keys(),
-            'Reason': response['final_invalid_non_working_domains_dict'].values()
+            'Domains': response['final_invalid_non_working_domains'],
         })
 
         export_df.to_excel(os.path.join(final_results_directory, 'final_invalid_non_working_domains.xlsx'), index=False, header=True)
+
+        export_df = pd.DataFrame({
+            'Domains': response['final_valid_working_domains'],
+        })
+
+        export_df.to_excel(os.path.join(final_results_directory, 'final_output.xlsx'), index=False, header=True)
 
         with open(log_file_paths['serper'], 'a') as f:
             f.write("\n\n")

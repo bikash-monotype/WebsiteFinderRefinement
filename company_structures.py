@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 import json
 from crewai import Agent, Task, Crew
 from tools import search_multiple_page
-from helpers import remove_trailing_slash, get_scrapegraph_config
+from helpers import remove_trailing_slash, get_scrapegraph_config, tokenize_text
 import json_repair
 
 load_dotenv()
@@ -246,6 +246,159 @@ def get_links_for_company_structures_for_private_company(main_company, log_file_
             expected_output="A list of URLs that can help identify the acquisitions/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of the given company.",
         )
 
+    subsidiary_finder_prompt_tokens = tokenize_text(
+        f"""
+            Link Researcher
+            Gather links that can help identify the brands/sub-brands/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of the given company.
+            You are a skilled web researcher with expertise in finding relevant information online.
+            Your task is to gather links that can help identify the web links that can help to find out the subsidiaries/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of the given company.
+            You are proficient in using search engines like Google to find web pages related to the subsidiaries/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of companies.
+            You know how to select multiple relevant URLs from search results that are likely to contain information about the subsidiaries/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of a company.
+
+            ```{subsidiary_finder_search_results['all_results']}```
+
+            From the above provided context, your task is to gather links that can help identify the subsidiaries, trusts, entities, charitable organizations, and companies with more than 50% partnership of the given company.
+            Follow these steps to ensure accurate and relevant results:
+            - Select multiple relevant URLs from the provided context that are likely to contain information about the subsidiaries, entities, trusts, charitable organizations, and companies with more than 50% partnership of {main_company}.
+            - Ensure the selected links are from reputable sources such as:
+                - Corporate Filings and Legal Documents (SEC, EDGAR)
+                - Company Websites
+                - Latest Annual reports of the company {main_company}
+                - Business Databases
+                - News and Press Releases about acquisitions/investments by the company {main_company}
+                - Social Media and LinkedIn of the company {main_company}
+                - Patents and Trademarks of the company {main_company}
+                - FOIA Requests (For Government Contractors)
+                - Networking and Industry Contacts
+                - Legal Databases
+                - Craft.co
+                - Zoominfo
+                - Pitchbook
+                - SEC.gov
+                - Bloomberg
+                - Reuters
+                - Hoovers
+                - MarketWatch
+                - Yahoo Finance
+                - Forbes
+                - Business Insider
+                - If no relevant links are found, return "[]".
+            - Make sure, those relevant urls should be unique and not repeated.
+
+            Output the results in the following JSON format:
+            ["URL1", "URL2", "URL3"]
+
+            Example:
+            ["https://www.example.com/subsidiaries-of-alphabet", "https://www.example.com/alphabet-brands"]
+
+            Important note: Every step mentioned above must be followed to get the required results.
+            Do not provide any other texts or information in the output as it will not work with the further process.
+            Do not include ``` or any other such characters in the output.
+        """
+    )
+
+    brands_finder_prompt_tokens = tokenize_text(
+        f"""
+            Link Researcher
+            Gather links that can help identify the brands/sub-brands/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of the given company.
+            You are a skilled web researcher with expertise in finding relevant information online.
+            Your task is to gather links that can help identify the web links that can help to find out the brands/sub-brands/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of the given company.
+            You are proficient in using search engines like Google to find web pages related to the brands/sub-brands/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of companies.
+            You know how to select multiple relevant URLs from search results that are likely to contain information about the brands/sub-brands/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of a company.
+
+            ```{brands_finder_search_results['all_results']}```
+
+            From the above provided context, your task is to gather links that can help identify the brands, subbrands, trusts, entities, charitable organizations, and companies with more than 50% partnership of the given company.
+            Follow these steps to ensure accurate and relevant results:
+            - Select multiple relevant URLs from the provided context that are likely to contain information about the brands, subbrands, entities, trusts, charitable organizations, and companies with more than 50% partnership of {main_company}.
+            - Ensure the selected links are from reputable sources such as:
+                - Corporate Filings and Legal Documents (SEC, EDGAR)
+                - Company Websites
+                - Latest Annual reports of the company {main_company}
+                - Business Databases
+                - News and Press Releases about acquisitions/investments by the company {main_company}
+                - Social Media and LinkedIn of the company {main_company}
+                - Patents and Trademarks of the company {main_company}
+                - FOIA Requests (For Government Contractors)
+                - Networking and Industry Contacts
+                - Legal Databases
+                - Craft.co
+                - Zoominfo
+                - Pitchbook
+                - SEC.gov
+                - Bloomberg
+                - Reuters
+                - Hoovers
+                - MarketWatch
+                - Yahoo Finance
+                - Forbes
+                - Business Insider
+                - If no relevant links are found, return "[]".
+            - Make sure, those relevant urls should be unique and not repeated.
+
+            Output the results in the following JSON format:
+            ["URL1", "URL2", "URL3"]
+
+            Example:
+            ["https://www.example.com/subsidiaries-of-alphabet", "https://www.example.com/alphabet-brands"]
+
+            Important note: Every step mentioned above must be followed to get the required results.
+            Do not provide any other texts or information in the output as it will not work with the further process.
+            Do not include ``` or any other such characters in the output.
+        """
+    )
+
+    acquisitions_finder_prompt_tokens = tokenize_text(
+        f"""
+            Link Researcher
+            Gather links that can help identify the acquisitions/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of the given company.
+            You are a skilled web researcher with expertise in finding relevant information online.
+            Your task is to gather links that can help identify the web links that can help to find out the acquisitions/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of the given company.
+            You are proficient in using search engines like Google to find web pages related to the acquisitions/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of companies.
+            You know how to select multiple relevant URLs from search results that are likely to contain information about the acquisitions/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of a company.
+
+            ```{acquisitions_finder_search_results['all_results']}```
+
+            From the above provided context, your task is to gather links that can help identify the acquisitions, trusts, entities, charitable organizations, and companies with more than 50% partnership of the given company.
+            Follow these steps to ensure accurate and relevant results:
+            - Select multiple relevant URLs from the provided context that are likely to contain information about the acquisitions, entities, trusts, charitable organizations, and companies with more than 50% partnership of {main_company}.
+            - Ensure the selected links are from reputable sources such as:
+                - Corporate Filings and Legal Documents (SEC, EDGAR)
+                - Company Websites
+                - Latest Annual reports of the company {main_company}
+                - Business Databases
+                - News and Press Releases about acquisitions/investments by the company {main_company}
+                - Social Media and LinkedIn of the company {main_company}
+                - Patents and Trademarks of the company {main_company}
+                - FOIA Requests (For Government Contractors)
+                - Networking and Industry Contacts
+                - Legal Databases
+                - Craft.co
+                - Zoominfo
+                - Pitchbook
+                - SEC.gov
+                - Bloomberg
+                - Reuters
+                - Hoovers
+                - MarketWatch
+                - Yahoo Finance
+                - Forbes
+                - Business Insider
+                - If no relevant links are found, return "[]".
+            - Make sure, those relevant urls should be unique and not repeated.
+
+            Output the results in the following JSON format:
+            ["URL1", "URL2", "URL3"]
+
+            Example:
+            ["https://www.example.com/subsidiaries-of-alphabet", "https://www.example.com/alphabet-brands"]
+
+            Important note: Every step mentioned above must be followed to get the required results.
+            Do not provide any other texts or information in the output as it will not work with the further process.
+            Do not include ``` or any other such characters in the output.
+        """
+    )
+
     trip_crew_subsidiary_research = Crew(
         agents=[
             subsidiary_finder_link_grabber_agent,
@@ -263,6 +416,32 @@ def get_links_for_company_structures_for_private_company(main_company, log_file_
     )
     trip_crew_subsidiary_research.kickoff()
 
+    subsidiary_finder_completions_tokens = tokenize_text(
+        f"""
+            Thought: I now can give a great answer
+            Final Answer: {str(subsidiary_finder_link_grabber_task.output.raw)}
+        """
+    )
+
+    brands_finder_completions_tokens = tokenize_text(
+        f"""
+            Thought: I now can give a great answer
+            Final Answer: {str(brands_finder_link_grabber_task.output.raw)}
+        """
+    )
+
+    acquisitions_finder_completions_tokens = tokenize_text(
+        f"""
+            Thought: I now can give a great answer
+            Final Answer: {str(acquisitions_finder_link_grabber_task.output.raw)}
+        """
+    )
+
+    llm_usage = {
+        'prompt_tokens': subsidiary_finder_prompt_tokens + brands_finder_prompt_tokens + acquisitions_finder_prompt_tokens,
+        'completion_tokens': subsidiary_finder_completions_tokens + brands_finder_completions_tokens + acquisitions_finder_completions_tokens
+    }
+
     subsidiary_finder_links = json_repair.loads(subsidiary_finder_link_grabber_task.output.raw)
     brands_finder_links = json_repair.loads(brands_finder_link_grabber_task.output.raw)
     acquisitions_finder_links = json_repair.loads(acquisitions_finder_link_grabber_task.output.raw)
@@ -273,14 +452,12 @@ def get_links_for_company_structures_for_private_company(main_company, log_file_
 
     research_links_results = set(subsidiary_finder_links) | set(brands_finder_links) | set(acquisitions_finder_links)
 
-    llm_usage = trip_crew_subsidiary_research.calculate_usage_metrics()
-
     return {
         'links': list(research_links_results),
         'serper_credits': subsidiary_finder_search_results['serper_credits'] + brands_finder_search_results['serper_credits'] + acquisitions_finder_search_results['serper_credits'],
         'llm_usage': {
-            'prompt_tokens': llm_usage.prompt_tokens,
-            'completion_tokens': llm_usage.completion_tokens
+            'prompt_tokens': llm_usage['prompt_tokens'],
+            'completion_tokens': llm_usage['completion_tokens']
         },
     }
 

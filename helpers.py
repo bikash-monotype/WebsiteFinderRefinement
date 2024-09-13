@@ -11,6 +11,7 @@ from dotenv import load_dotenv
 import requests
 from requests.exceptions import ConnectTimeout
 from tenacity import retry, stop_after_attempt, wait_fixed
+import tiktoken
 
 load_dotenv()
 
@@ -141,6 +142,12 @@ def extract_domain_name(url):
 
     return domain_name
 
+def tokenize_text(text):
+    encoding = tiktoken.encoding_for_model(os.getenv('AZURE_OPENAI_MODEL_NAME'))
+    tokens = encoding.encode(text)
+
+    return len(tokens)
+
 def create_result_directory(output_folder, main_directory):
     script_dir = os.path.dirname(os.path.abspath(__file__))
     final_results_path = os.path.join(script_dir, main_directory)
@@ -158,6 +165,7 @@ def create_result_directory(output_folder, main_directory):
         'llm': os.path.join(new_folder_path, "llm.txt"),
         'crew_ai': os.path.join(new_folder_path, "crew_ai.txt"),
         'serper': os.path.join(new_folder_path, "serper.txt"),
+        'links': os.path.join(new_folder_path, "links.txt")
     }
 
 def extract_year(copyright_text):

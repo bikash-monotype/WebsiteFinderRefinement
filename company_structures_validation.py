@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from crewai import Agent, Task, Crew, Process
 import streamlit as st
 import multiprocessing
-from helpers import process_worker_function, calculate_openai_costs, pad_list
+from helpers import process_worker_function, calculate_openai_costs, pad_list, tokenize_text
 import dill
 from functools import partial
 from tools import search_multiple_page
@@ -57,6 +57,24 @@ def process_single_company_structure_validation(main_company, subsidiary, log_fi
         expected_output="['{subsidiary}', 'Yes/No', 'Source URL']"  # Specify that a URL is expected for source verification
     )
 
+    prompt_tokens = tokenize_text(
+        f"""
+            Corporate Relationship Analyst.
+            Evaluate the relationship between {subsidiary} and {main_company} across multiple dimensions, including but not limited to subsidiary status, branding, acquisitions, partnerships, and organizational affiliations.
+            As an expert in corporate affiliations and structures, you have developed an ability to discern complex corporate relationships using official documentation and reliable sources. You have a proven track record of accurately identifying the nature of business relationships, ensuring that all findings are grounded in verifiable data.
+            Your research is always directed towards official corporate sites or authoritative government records. This ensures that the information you gather is both relevant and legally sound. Each claim about a relationship is backed by solid evidence from trusted sources, eliminating any room for ambiguity or error.
+            Your role involves not only identifying these relationships but also documenting them in a way that can be easily understood and verified by stakeholders, ensuring clarity and accountability in corporate governance.
+            
+            Using the search results provided:
+
+            {search_results['all_results']}
+
+            Determine if {subsidiary} is related to {main_company} as a subsidiary, brand, sub-brand, acquisition, trust, entity, global operation, charitable organization, or holds a significant partnership (>50% ownership).
+            Focus exclusively on the information above. Be meticulous in validating the source of each piece of data. If no definitive information is available, specify 'N/A'. Incorrect or speculative entries will result in penalties.
+            It is critical to cite the exact source that confirms the nature of the relationship. Ensure that all responses adhere to the expected output format to avoid penalties.
+        """
+    )
+
     validation_crew = Crew(
         agents=[company_structures_validation_researcher],
         tasks=[company_structures_validation_task],
@@ -70,14 +88,23 @@ def process_single_company_structure_validation(main_company, subsidiary, log_fi
         'search_results': search_results['all_results']
     })
 
+    completion_tokens = tokenize_text(f"""
+        Thought: I now can give a great answer
+        Final Answer: {str(results.raw)}
+    """)
+
+    llm_usage = {
+        'prompt_tokens': prompt_tokens,
+        'completion_tokens': completion_tokens
+    }
+
     results = json_repair.loads(results.raw)
-    llm_usage = validation_crew.calculate_usage_metrics()
 
     return {
         'results': results,
         'llm_usage': {
-            'prompt_tokens': llm_usage.prompt_tokens,
-            'completion_tokens': llm_usage.completion_tokens
+            'prompt_tokens': llm_usage['prompt_tokens'],
+            'completion_tokens': llm_usage['completion_tokens']
         },
         'serper_credits': search_results['serper_credits']
     }

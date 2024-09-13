@@ -10,7 +10,7 @@ from functools import partial
 from helpers import extract_domain_name
 from copyright import get_copyright
 import re
-from helpers import extract_year, extract_main_part, get_links, process_worker_function
+from helpers import extract_year, extract_main_part, get_links, process_worker_function, tokenize_text
 import dill
 from dotenv import load_dotenv
 
@@ -129,6 +129,20 @@ def process_subsidiary(subsidiary, main_company, sample_expert_website_researche
         expected_output="All possible official website of the company. {company_name}",
     )
 
+    prompt_tokens = tokenize_text(
+        f"""
+            Expert Website Researcher.
+            Accurately identify the main website of the company {subsidiary} , which is a part of {main_company}.
+           
+            You have been a part of {main_company} for many years and have a deep understanding of the company's operations and online presence.
+            As a seasoned investigator in the digital realm, you are a skilled web researcher capable of finding accurate company websites using search engines and verifying the information.
+            With years of being with {subsidiary}, you are well known about the ins and outs of this company.
+            You know all the websites with copyright same as main website of these.
+            You also are expert in google searching and using sites like crunchbase, and Pitch book, etc to find the company details and get the website.
+            You are meticulus and organized, and you only provide correct and precise data i.e. websites that you have identified correctly.
+        """
+    )
+
     expert_website_researcher_crew_1 = Crew(
         agents=[expert_website_researcher_agent_1],
         tasks=[expert_website_researcher_task_1],
@@ -137,8 +151,20 @@ def process_subsidiary(subsidiary, main_company, sample_expert_website_researche
     )
     
     results = expert_website_researcher_crew_1.kickoff(inputs={"company_name": subsidiary, "main_company": main_company, "search_results": search_results, "sample_expert_website_researcher_output": sample_expert_website_researcher_output})
-    llm_usage = results.token_usage
+
+    completions_tokens = tokenize_text(
+        f"""
+            Thought: I now can give a great answer
+            Final Answer: {str(results.raw)}
+        """
+    )
+
     results = json_repair.loads(results.raw)
+
+    llm_usage = {
+        'prompt_tokens': prompt_tokens,
+        'completion_tokens': completions_tokens
+    }
 
     with open(log_file_paths['crew_ai'], 'a') as f:
         f.write("\n")
@@ -147,8 +173,8 @@ def process_subsidiary(subsidiary, main_company, sample_expert_website_researche
     return {
         'websites': results,
         'llm_usage': {
-            'prompt_tokens': llm_usage.prompt_tokens,
-            'completion_tokens': llm_usage.completion_tokens
+            'prompt_tokens': llm_usage['prompt_tokens'],
+            'completion_tokens': llm_usage['completion_tokens']
         },
         'serper_credits': total_serper_credits
     }
@@ -187,9 +213,15 @@ def process_domain_research(website_urls, log_file_paths):
 
     for website in website_urls:
         website_main_parts.add(extract_main_part(website))
+    total_domains = len(website_main_parts)
+
+    if total_domains == 0:
+        return {
+            'domain_search_results': [],
+            'serper_credits': total_serper_credits
+        }
 
     progress_bar = st.progress(0)
-    total_domains = len(website_main_parts)
     progress_step = 1 / total_domains
 
     process_domain_research_with_log_file = partial(process_single_domain_research, log_file_paths=log_file_paths)
@@ -213,9 +245,12 @@ def process_domain_research(website_urls, log_file_paths):
 
 def process_link_grabber(website_urls, log_file_paths):
     website_urls = set(website_urls)
+    total_urls = len(website_urls)
+
+    if total_urls == 0:
+        return set()
 
     progress_bar = st.progress(0)
-    total_urls = len(website_urls)
     progress_step = 1 / total_urls
 
     link_grabber_results = set()
@@ -303,9 +338,15 @@ def process_copyright_research(unique_copyrights, log_file_paths):
     copyright_results = set()
 
     total_serper_credits = 0
+    total_copyrights = unique_copyrights.shape[0]
+
+    if total_copyrights == 0:
+        return {
+            'copyright_results': [],
+            'serper_credits': total_serper_credits
+        }
 
     progress_bar = st.progress(0)
-    total_copyrights = unique_copyrights.shape[0]
     progress_step = 1 / total_copyrights
 
     process_copyright_research_with_log_file = partial(process_single_copyright_research, log_file_paths=log_file_paths)

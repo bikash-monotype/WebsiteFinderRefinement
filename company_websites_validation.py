@@ -11,7 +11,7 @@ import dill
 from helpers import process_worker_function, extract_domain_name, is_working_domain
 from tools import search_multiple_page
 import json_repair
-from helpers import calculate_openai_costs
+from helpers import calculate_openai_costs, tokenize_text
 
 load_dotenv()
 
@@ -139,6 +139,42 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
         expected_output="['{domain}', 'Yes/No']"
     )
 
+    prompt_tokens = tokenize_text(
+        f"""
+            Domain Relationship Analyst.
+            Validate the relationship between {domain} and {main_company}, assessing whether the domain is officially affiliated with the company. This includes investigating domain ownership, brand association, legal or business affiliations, and any partnerships or acquisitions involving the domain and the company.
+            As an expert in domain ownership and corporate affiliations, you specialize in identifying the connections between domains and companies. You excel at conducting thorough research using official sources like WHOIS records, company websites, press releases, and legal documents to verify domain ownership and affiliations.
+            Your findings are grounded in verifiable data, ensuring that each conclusion about the relationship between a domain and a company is backed by solid, authoritative evidence. You prioritize clarity and accuracy, providing stakeholders with trustworthy information on domain affiliations.
+            In your role, you document the findings in a manner that is easy to understand and verify, making sure that all relationships are clearly defined and backed by strong evidence.
+            
+            Using the search results provided:
+
+            {search_results['all_results']}
+
+            Determine if the domain "{domain}" is associated with "{main_company}" through one of the following:
+
+            1. Official domain ownership
+            2. Entity association
+            3. Brand or sub-brand
+            4. Acquisition or partnership
+
+            Focus on clear evidence of association, using both exact and partial matches. Consider the context and relationships described.
+
+            **Note:** If the domain is **for sale**, return 'No'
+
+            If the relationship is valid, return 'Yes'. If not, return 'No'
+
+            Only use information from the search results. Avoid assumptions.
+
+            Output format:
+            ['{domain}', 'Yes/No']
+
+            **Scoring:**
+            - +1 for correct output (based on evidence)
+            - -1 for incorrect or speculative output
+        """
+    )
+
     validation_crew = Crew(
         agents=[domain_company_validation_researcher],
         tasks=[domain_company_validation_task],
@@ -153,7 +189,16 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
         'search_results': search_results['all_results']
     })
 
-    llm_usage = results.token_usage
+    completion_tokens = tokenize_text(f"""
+        Thought: I now can give a great answer
+        Final Answer: {str(results.raw)}
+    """)
+
+    llm_usage = {
+        'prompt_tokens': prompt_tokens,
+        'completion_tokens': completion_tokens
+    }
+
     results = json_repair.loads(results.raw)
 
     with open(log_file_paths['crew_ai'], 'a') as f:
@@ -163,8 +208,8 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
     return {
         'results': results,
         'llm_usage': {
-            'prompt_tokens': llm_usage.prompt_tokens,
-            'completion_tokens': llm_usage.completion_tokens
+            'prompt_tokens': llm_usage['prompt_tokens'],
+            'completion_tokens': llm_usage['completion_tokens']
         },
         'serper_credits': search_results['serper_credits']
     }
