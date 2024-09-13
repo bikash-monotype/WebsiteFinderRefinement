@@ -5,7 +5,7 @@ import os
 from company_structures import get_company_structures, get_links_for_company_structures_for_private_company
 import multiprocessing
 from functools import partial
-from helpers import create_result_directory, extract_domain_name, get_main_domain, process_worker_function, calculate_openai_costs
+from helpers import create_result_directory, extract_domain_name, get_main_domain, process_worker_function, calculate_openai_costs, get_serper_costs
 from datetime import datetime
 import pandas as pd
 from company_structures_validation import validate_company_structure
@@ -92,6 +92,11 @@ if submit_button:
             except ValueError as e:
                 urls = []
 
+        with open(log_file_paths['links'], 'a') as f:
+            f.write(f"\n\n")
+            f.write(f"SEC API Response:\n")
+            f.write(f"{str(urls)}\n")
+
         # st.write("###### No url found for the given company")
 
         st.write("###### Fetching links for finding company structures")
@@ -116,6 +121,7 @@ if submit_button:
             f.write("\n\n")
             f.write(f"Finding links for subsidiaries for private subsidiaries:\n")
             f.write(f"Total Credits: {all_links['serper_credits']}\n")
+            f.write(f"Total Cost in USD: {get_serper_costs(all_links['serper_credits'])}\n")
 
         if all_links['links'] is not None:
             urls.extend(all_links['links'])
@@ -147,6 +153,7 @@ if submit_button:
                 f.write("\n\n")
                 f.write(f"Finding links for subsidiaries for private subsidiaries:\n")
                 f.write(f"Total Credits: {all_links['serper_credits']}\n")
+                f.write(f"Total Cost in USD: {get_serper_costs(all_links['serper_credits'])}\n")
 
             urls = all_links['links']
         else:
@@ -251,6 +258,7 @@ if submit_button:
             f.write("\n\n")
             f.write(f"Validating subsidiaries:\n")
             f.write(f"Total Credits: {valid_subsidiaries['serper_credits']}\n")
+            f.write(f"Total Cost in USD: {get_serper_costs(valid_subsidiaries['serper_credits'])}\n")
 
         whole_process_prompt_tokens += valid_subsidiaries['llm_usage']['prompt_tokens']
         whole_process_completion_tokens += valid_subsidiaries['llm_usage']['completion_tokens']
@@ -273,6 +281,7 @@ if submit_button:
             f.write("\n\n")
             f.write(f"Finding official websites for the subsidiaries:\n")
             f.write(f"Total Credits: {websites['serper_credits']}\n")
+            f.write(f"Total Cost in USD: {get_serper_costs(websites['serper_credits'])}\n")
 
         whole_process_prompt_tokens += websites['llm_usage']['prompt_tokens']
         whole_process_completion_tokens += websites['llm_usage']['completion_tokens']
@@ -322,6 +331,7 @@ if submit_button:
             f.write("\n\n")
             f.write(f"Finding websites using copyright search:\n")
             f.write(f"Total Credits: {copyright_research['serper_credits']}\n")
+            f.write(f"Total Cost in USD: {get_serper_costs(copyright_research['serper_credits'])}\n")
 
         whole_process_serper_credits += copyright_research['serper_credits']
 
@@ -335,6 +345,7 @@ if submit_button:
             f.write("\n\n")
             f.write(f"Finding websites using domain search:\n")
             f.write(f"Total Credits: {domain_research['serper_credits']}\n")
+            f.write(f"Total Cost in USD: {get_serper_costs(domain_research['serper_credits'])}\n")
 
         whole_process_serper_credits += domain_research['serper_credits']
 
@@ -379,6 +390,7 @@ if submit_button:
             f.write("\n\n")
             f.write(f"Validation domains.\n")
             f.write(f"Total Credits: {response['total_serper_credits']}\n")
+            f.write(f"Total Cost in USD: {get_serper_costs(response['total_serper_credits'])}\n")
 
         with open(log_file_paths['llm'], 'a') as f:
             f.write("\n\n")
@@ -406,5 +418,6 @@ if submit_button:
             f.write(f"Total Completion Tokens: {whole_process_completion_tokens}\n")
             f.write(f"Total Cost in USD: {whole_process_llm_costs}\n")
             f.write(f"Total Serper Credits: {whole_process_serper_credits}\n")
+            f.write(f"Total Cost in USD for Serper Credits: {get_serper_costs(whole_process_serper_credits)}\n")
     except Exception as e:
         st.error(f"An error occurred: {e}")

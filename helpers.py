@@ -82,6 +82,9 @@ def remove_trailing_slash(links):
 def pad_list(lst, length):
     return lst + [None] * (length - len(lst))
 
+def get_serper_costs(serper_credits):
+    return (float(serper_credits) / 1000) * float(os.getenv('SERPER_COST'))
+
 def get_scrapegraph_config():
     azure_model = AzureChatOpenAI(
         openai_api_version=os.getenv('OPENAI_API_VERSION'),
