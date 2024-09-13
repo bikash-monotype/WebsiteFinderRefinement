@@ -203,8 +203,6 @@ if submit_button:
                     total_completion_tokens += exec_info.get('completion_tokens', 0)
                     total_cost_USD += exec_info.get('total_cost_USD', 0.0)
 
-        st.write(company_structure_set)
-
         with open(log_file_paths['llm'], 'a') as f:
             f.write(f"\n\n")
             f.write(f"Finding subsidiaries:\n")
