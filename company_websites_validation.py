@@ -314,7 +314,7 @@ def validate_domains(domains, main_company, log_file_path):
     valid_working_domains = set()
     invalid_non_working_domains = set()
 
-    chunk_size = 10
+    chunk_size = 20
     results = []
 
     with multiprocessing.Pool(processes=20) as pool:
