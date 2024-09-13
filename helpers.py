@@ -31,7 +31,7 @@ social_media_domain_main_part = [
     'threads', 'linkedin', 'pinterest', 'youtube', 'onetrust', 'amazon', 'reddit', 'wordpress', 'adobe',
     'tiktok', 'snapchat', 'whatsapp', 'quora', 'google', 'github', 'apple', 'vimeo', 'youtu', 'cloudflare', 'goo', 'mozilla', 'maps',
     'example', 'oauth', 'sec', 'researchgate', 'gov', 'microsoft', 'w3', 'wikipedia', 'mozilla', 'qq', 'you', 'jquery', 'shopifycdn', 'shopify', 'fontawesome', 'jsdelivr',
-    'myworkdayjobs', 'applytojob', 'device', 'site', 'q4cdn', 'softonic', 'c212', 'gstatic', 'x', 'unpkg', 'hcaptcha', 'yahoo', 'myshopify'
+    'myworkdayjobs', 'applytojob', 'device', 'site', 'q4cdn', 'softonic', 'c212', 'gstatic', 'x', 'unpkg', 'hcaptcha', 'yahoo', 'myshopify', 'amazonaws', 'nasa'
 ]
 
 llm = AzureChatOpenAI(
