@@ -5,7 +5,7 @@ from helpers import create_result_directory, extract_domain_name, pad_list, soci
 import os
 from company_websites_validation import validate_domains, validate_working_domains
 
-st.title("Accuracy check with GTD")
+st.title("Accuracy check without GTD")
 
 uploaded_file = st.file_uploader("Choose a file", type=["csv", "xlsx"])
 
@@ -20,15 +20,15 @@ if uploaded_file is not None and company_name is not None:
     if st.button("Process File"):
         print("Processing file...")
         start_time = datetime.now()
-        gtd = df['GTD'].tolist()
+        # gtd = df['GTD'].tolist()
         agentsOutput = df['AgentsOutput'].tolist()
 
-        gtd = [value for value in gtd if not pd.isna(value)]
+        # gtd = [value for value in gtd if not pd.isna(value)]
         agentsOutput = [value for value in agentsOutput if not pd.isna(value) and isinstance(value, str) and value != "." and extract_main_part(value) not in social_media_domain_main_part]
 
-        gtd = [extract_domain_name(url) for url in gtd]
-        gtd = set(gtd)
-        gtd = list(gtd)
+        # gtd = [extract_domain_name(url) for url in gtd]
+        # gtd = set(gtd)
+        # gtd = list(gtd)
 
         agentsOutput = set(agentsOutput)
         agentsOutput = list(agentsOutput)
@@ -111,59 +111,60 @@ if uploaded_file is not None and company_name is not None:
 
         endtime = datetime.now() - start_time
 
-        common_values = set(gtd).intersection(response['final_valid_working_domains'])
-        common_values = list(common_values)
+        # common_values = set(gtd).intersection(response['final_valid_working_domains'])
+        # common_values = list(common_values)
+        #
+        # missing_values_in_gtd = set(gtd).difference(response['final_valid_working_domains'])
+        # missing_values_in_gtd = list(missing_values_in_gtd)
+        #
+        # new_values_in_valid_output = set(response['final_valid_working_domains']).difference(gtd)
+        # new_values_in_valid_output = list(new_values_in_valid_output)
+        #
+        # accuracy = ((len(common_values) + len(new_values_in_valid_output)) / (len(gtd) + len(new_values_in_valid_output))) * 100
 
-        missing_values_in_gtd = set(gtd).difference(response['final_valid_working_domains'])
-        missing_values_in_gtd = list(missing_values_in_gtd)
-
-        new_values_in_valid_output = set(response['final_valid_working_domains']).difference(gtd)
-        new_values_in_valid_output = list(new_values_in_valid_output)
-
-        accuracy = ((len(common_values) + len(new_values_in_valid_output)) / (len(gtd) + len(new_values_in_valid_output))) * 100
-
-        max_length = max(len(gtd), len(agentsOutput), len(new_values_in_valid_output), len(gtd), len(common_values))
+        # max_length = max(len(gtd), len(agentsOutput), len(new_values_in_valid_output), len(gtd), len(common_values))
+        max_length = max(len(agentsOutput))
 
         res_data = {
             "Company Name": [f"{company_name}"],
-            'GTD': [len(gtd)],
+            # 'GTD': [len(gtd)],
             # 'Valid GTD': [len(valid_gtd)],
             # "Invalid GTD":[len(list(response2['invalid_non_working_domains'].keys()))],
             'AgentsOutput': [len(agentsOutput)],
             'Valid AgentsOutput': [len(list(response['final_valid_working_domains']))],
-            'Common Values': [len(common_values)],
-            'Missing Values from GTD':[len(missing_values_in_gtd)],
-            'New Values in Valid Output':[len(new_values_in_valid_output)],
-            'Accuracy': [accuracy],
+            # 'Common Values': [len(common_values)],
+            # 'Missing Values from GTD':[len(missing_values_in_gtd)],
+            # 'New Values in Valid Output':[len(new_values_in_valid_output)],
+            # 'Accuracy': [accuracy],
             'Folder': [result_directory]
         }
 
         res_df = pd.DataFrame(res_data)
 
-        acc_df = pd.read_excel("validation/Accuracy_New.xlsx",engine = "openpyxl")
+        acc_df = pd.read_excel("validation/response.xlsx",engine = "openpyxl")
         acc_df = pd.concat([acc_df,res_df])
-        acc_df.to_excel("validation/Accuracy_New.xlsx", index=False, engine="openpyxl")    
+        acc_df.to_excel("validation/response.xlsx", index=False, engine="openpyxl")
 
-        gtd = pad_list(gtd, max_length)
+        # gtd = pad_list(gtd, max_length)
         # valid_gtd = pad_list(valid_gtd, max_length)
         # invalid_gtd = pad_list(list(response2['invalid_non_working_domains'].keys()), max_length)
         agentsOutput = pad_list(agentsOutput, max_length)
         valid_agentsOutput = pad_list(list(response['final_valid_working_domains']), max_length)
-        common_values = pad_list(common_values, max_length)
-        missing_values_in_gtd = pad_list(missing_values_in_gtd, max_length)
-        new_values_in_valid_output = pad_list(new_values_in_valid_output, max_length)
-        accuracy_pad = pad_list([accuracy], max_length)
+        # common_values = pad_list(common_values, max_length)
+        # missing_values_in_gtd = pad_list(missing_values_in_gtd, max_length)
+        # new_values_in_valid_output = pad_list(new_values_in_valid_output, max_length)
+        # accuracy_pad = pad_list([accuracy], max_length)
 
         export_df = pd.DataFrame({
-            'GTD': gtd,
+            # 'GTD': gtd,
             # 'Valid GTD': valid_gtd,
             # 'Invalid GTD': invalid_gtd,
             'AgentsOutput': agentsOutput,
             'Valid AgentsOutput': valid_agentsOutput,
-            'Common Values': common_values,
-            'Missing Values from GTD': missing_values_in_gtd,
-            'New Values in Valid Output': new_values_in_valid_output,
-            'Accuracy': accuracy_pad,
+            # 'Common Values': common_values,
+            # 'Missing Values from GTD': missing_values_in_gtd,
+            # 'New Values in Valid Output': new_values_in_valid_output,
+            # 'Accuracy': accuracy_pad,
         })
 
         export_df.to_excel(os.path.join(final_results_directory, 'company_accuracy.xlsx'), index=False, header=True)
@@ -175,7 +176,7 @@ if uploaded_file is not None and company_name is not None:
             f.write(f"Total Completion Tokens: {whole_process_completion_tokens}\n")
             f.write(f"Total Cost in USD: {whole_process_llm_costs}\n")
             f.write(f"Total Serper Credits: {whole_process_serper_credits}\n")
-            f.write(f"Accuracy: {accuracy}%\n")
+            # f.write(f"Accuracy: {accuracy}%\n")
 
         st.write(f"Time Taken To Complete the whole process: {endtime}")
-        st.write(f"Accuracy: {accuracy}")
+        # st.write(f"Accuracy: {accuracy}")
