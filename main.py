@@ -1,5 +1,5 @@
 import os
-import config
+# import config
 import pandas as pd
 import json
 from dotenv import load_dotenv
@@ -200,9 +200,9 @@ def process_subsidiary(subsidiary, main_company, sample_expert_website_researche
 def main():
     companies = [
         {
-            'file': 'phillips66_missed.xlsx',
-            'main_company': 'Phillips 66',
-            'output_folder': 'Phillips66'
+            'file': 'blackriflecoffee.xlsx',
+            'main_company': 'Black Rifle coffee',
+            'output_folder': 'BlackRiflecoffee'
         },
     ]
 
@@ -365,7 +365,7 @@ def main():
                     link_grabber_results.add(extract_domain_name(link))
         
         df = pd.DataFrame(link_grabber_results, columns=['Website URL'])
-        df_link_grabber_output = pd.DataFrame(link_grabber_results, columns=['Link_Grabber'])
+        # df_link_grabber_output = pd.DataFrame(link_grabber_results, columns=['Link_Grabber'])
         df = df.to_excel('./final_results/' + output_folder + '/link_grabber_agent' + '.xlsx', engine='openpyxl', index=False)
 
         print(link_grabber_results)
