@@ -92,6 +92,16 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
                 translate_search_string = translate_text(f"site:{domain} a part of {main_company}?")
 
                 search_results = search_multiple_page(translate_search_string['converted_text'], 10, 1, log_file_path=log_file_paths['log'])
+
+                if len(search_results['all_results']) == 0:
+                    return {
+                        'results': [domain, 'No'],
+                        'llm_usage': {
+                            'prompt_tokens': 0,
+                            'completion_tokens': 0
+                        },
+                        'serper_credits': search_results['serper_credits']
+                    }
             else:
                 return {
                     'results': [domain, 'No'],
