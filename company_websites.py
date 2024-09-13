@@ -13,6 +13,7 @@ import re
 from helpers import extract_year, extract_main_part, get_links, process_worker_function, tokenize_text
 import dill
 from dotenv import load_dotenv
+import time
 
 load_dotenv()
 
@@ -77,107 +78,120 @@ def process_website_and_get_copyrights(websites, log_file_paths):
     }
 
 def process_subsidiary(subsidiary, main_company, sample_expert_website_researcher_output, log_file_paths):
-    search_results1 = search_multiple_page(f"{subsidiary} a part of {main_company} official website", 10, 1, log_file_paths['log'])
-    search_results2 = search_multiple_page(f"{subsidiary} official website", 10, 1, log_file_paths['log'])
-    search_results3 = search_multiple_page(f"{subsidiary}", 10, 1, log_file_paths['log'])
+    try:
+        search_results1 = search_multiple_page(f"{subsidiary} a part of {main_company} official website", 10, 1, log_file_paths['log'])
+        search_results2 = search_multiple_page(f"{subsidiary} official website", 10, 1, log_file_paths['log'])
+        search_results3 = search_multiple_page(f"{subsidiary}", 10, 1, log_file_paths['log'])
 
-    total_serper_credits = search_results1['serper_credits'] + search_results2['serper_credits'] + search_results3['serper_credits']
+        total_serper_credits = search_results1['serper_credits'] + search_results2['serper_credits'] + search_results3['serper_credits']
 
-    search_results = json.dumps(search_results1['all_results'] + search_results2['all_results'] + search_results3['all_results'])
+        search_results = json.dumps(search_results1['all_results'] + search_results2['all_results'] + search_results3['all_results'])
 
-    expert_website_researcher_agent_1 = Agent(
-        role="Expert Website Researcher",
-        goal="Accurately identify the main website of the company {company_name} , which is a part of {main_company}.",
-        verbose=True,
-        llm=default_llm,
-        model_name=os.getenv('AZURE_OPENAI_MODEL_NAME'),
-        allow_delegation=False,
-        backstory="""
-            You have been a part of {main_company} for many years and have a deep understanding of the company's operations and online presence.
-            As a seasoned investigator in the digital realm, you are a skilled web researcher capable of finding accurate company websites using search engines and verifying the information.
-            With years of being with {company_name}, you are well known about the ins and outs of this company.
-            You know all the websites with copyright same as main website of these.
-            You also are expert in google searching and using sites like crunchbase, and Pitch book, etc to find the company details and get the website.
-            You are meticulus and organized, and you only provide correct and precise data i.e. websites that you have identified correctly.""",
-    )
+        expert_website_researcher_agent_1 = Agent(
+            role="Expert Website Researcher",
+            goal="Accurately identify the main website of the company {company_name} , which is a part of {main_company}.",
+            verbose=True,
+            llm=default_llm,
+            model_name=os.getenv('AZURE_OPENAI_MODEL_NAME'),
+            allow_delegation=False,
+            backstory="""
+                You have been a part of {main_company} for many years and have a deep understanding of the company's operations and online presence.
+                As a seasoned investigator in the digital realm, you are a skilled web researcher capable of finding accurate company websites using search engines and verifying the information.
+                With years of being with {company_name}, you are well known about the ins and outs of this company.
+                You know all the websites with copyright same as main website of these.
+                You also are expert in google searching and using sites like crunchbase, and Pitch book, etc to find the company details and get the website.
+                You are meticulus and organized, and you only provide correct and precise data i.e. websites that you have identified correctly.""",
+        )
 
-    expert_website_researcher_task_1 = Task(
-        description=(
+        expert_website_researcher_task_1 = Task(
+            description=(
+                """
+                    {search_results}
+
+                    Your task is to identify all potential official websites for the company {company_name}, which is a subsidiary of {main_company}, based on the search results provided above.
+
+                    Instructions:
+                    1. Thoroughly review each search result to ensure accuracy.
+                    2. Identify the most relevant and official websites associated with {company_name}.
+                    3. Consider factors such as domain authority, content relevance, and official branding.
+                    4. Ensure the websites are possible official websites of the given subsidiary.
+                    6. Exclude unrelated third-party profiles (e.g., Bloomberg, Meta, LinkedIn, Pitchbook, App store, Wikipedia, Encyclopedia) unless they are the primary online presence of the company.
+                    7. List all identified websites in a clear and organized manner.
+
+                    Sample Output:
+                    {sample_expert_website_researcher_output}
+
+                    Important notes:
+                    - Every set of rules and steps mentioned above must be followed to get the required results.
+                    - Do not provide any other texts or information in the output as it will not work with the further process.
+                    - Do not include ``` or any other such characters in the output.
+                """
+            ),
+            agent=expert_website_researcher_agent_1,
+            expected_output="All possible official website of the company. {company_name}",
+        )
+
+        prompt_tokens = tokenize_text(
+            f"""
+                Expert Website Researcher.
+                Accurately identify the main website of the company {subsidiary} , which is a part of {main_company}.
+            
+                You have been a part of {main_company} for many years and have a deep understanding of the company's operations and online presence.
+                As a seasoned investigator in the digital realm, you are a skilled web researcher capable of finding accurate company websites using search engines and verifying the information.
+                With years of being with {subsidiary}, you are well known about the ins and outs of this company.
+                You know all the websites with copyright same as main website of these.
+                You also are expert in google searching and using sites like crunchbase, and Pitch book, etc to find the company details and get the website.
+                You are meticulus and organized, and you only provide correct and precise data i.e. websites that you have identified correctly.
             """
-                {search_results}
+        )
 
-                Your task is to identify all potential official websites for the company {company_name}, which is a subsidiary of {main_company}, based on the search results provided above.
+        expert_website_researcher_crew_1 = Crew(
+            agents=[expert_website_researcher_agent_1],
+            tasks=[expert_website_researcher_task_1],
+            process=Process.sequential,
+            verbose=1
+        )
+        
+        time.sleep(3)
+        results = expert_website_researcher_crew_1.kickoff(inputs={"company_name": subsidiary, "main_company": main_company, "search_results": search_results, "sample_expert_website_researcher_output": sample_expert_website_researcher_output})
 
-                Instructions:
-                1. Thoroughly review each search result to ensure accuracy.
-                2. Identify the most relevant and official websites associated with {company_name}.
-                3. Consider factors such as domain authority, content relevance, and official branding.
-                4. Ensure the websites are possible official websites of the given subsidiary.
-                6. Exclude unrelated third-party profiles (e.g., Bloomberg, Meta, LinkedIn, Pitchbook, App store, Wikipedia, Encyclopedia) unless they are the primary online presence of the company.
-                7. List all identified websites in a clear and organized manner.
-
-                Sample Output:
-                {sample_expert_website_researcher_output}
-
-                Important notes:
-                - Every set of rules and steps mentioned above must be followed to get the required results.
-                - Do not provide any other texts or information in the output as it will not work with the further process.
-                - Do not include ``` or any other such characters in the output.
+        completions_tokens = tokenize_text(
+            f"""
+                Thought: I now can give a great answer
+                Final Answer: {str(results.raw)}
             """
-        ),
-        agent=expert_website_researcher_agent_1,
-        expected_output="All possible official website of the company. {company_name}",
-    )
+        )
 
-    prompt_tokens = tokenize_text(
-        f"""
-            Expert Website Researcher.
-            Accurately identify the main website of the company {subsidiary} , which is a part of {main_company}.
-           
-            You have been a part of {main_company} for many years and have a deep understanding of the company's operations and online presence.
-            As a seasoned investigator in the digital realm, you are a skilled web researcher capable of finding accurate company websites using search engines and verifying the information.
-            With years of being with {subsidiary}, you are well known about the ins and outs of this company.
-            You know all the websites with copyright same as main website of these.
-            You also are expert in google searching and using sites like crunchbase, and Pitch book, etc to find the company details and get the website.
-            You are meticulus and organized, and you only provide correct and precise data i.e. websites that you have identified correctly.
-        """
-    )
+        results = json_repair.loads(results.raw)
 
-    expert_website_researcher_crew_1 = Crew(
-        agents=[expert_website_researcher_agent_1],
-        tasks=[expert_website_researcher_task_1],
-        process=Process.sequential,
-        verbose=1
-    )
-    
-    results = expert_website_researcher_crew_1.kickoff(inputs={"company_name": subsidiary, "main_company": main_company, "search_results": search_results, "sample_expert_website_researcher_output": sample_expert_website_researcher_output})
+        llm_usage = {
+            'prompt_tokens': prompt_tokens,
+            'completion_tokens': completions_tokens
+        }
 
-    completions_tokens = tokenize_text(
-        f"""
-            Thought: I now can give a great answer
-            Final Answer: {str(results.raw)}
-        """
-    )
-
-    results = json_repair.loads(results.raw)
-
-    llm_usage = {
-        'prompt_tokens': prompt_tokens,
-        'completion_tokens': completions_tokens
-    }
-
-    with open(log_file_paths['crew_ai'], 'a') as f:
-        f.write("\n")
-        f.write(f"{subsidiary} official website finder" + str(llm_usage))
-    
-    return {
-        'websites': results,
-        'llm_usage': {
-            'prompt_tokens': llm_usage['prompt_tokens'],
-            'completion_tokens': llm_usage['completion_tokens']
-        },
-        'serper_credits': total_serper_credits
-    }
+        with open(log_file_paths['crew_ai'], 'a') as f:
+            f.write("\n")
+            f.write(f"{subsidiary} official website finder" + str(llm_usage))
+        
+        return {
+            'websites': results,
+            'llm_usage': {
+                'prompt_tokens': llm_usage['prompt_tokens'],
+                'completion_tokens': llm_usage['completion_tokens']
+            },
+            'serper_credits': total_serper_credits
+        }
+    except Exception as e:
+        with open(log_file_paths['log'], 'a') as f:
+            f.write(f"\nError processing subsidiary {subsidiary}: {str(e)}")
+        return {
+            'websites': {},
+            'llm_usage': {
+                'prompt_tokens': 0,
+                'completion_tokens': 0
+            },
+            'serper_credits': 0
+        }
 
 def process_single_domain_research(main_part, log_file_paths):
     domain_search_results = set()

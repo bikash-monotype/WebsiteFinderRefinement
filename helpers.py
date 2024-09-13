@@ -16,6 +16,7 @@ import pycountry
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 import json_repair
+import time
 
 load_dotenv()
 
@@ -30,7 +31,7 @@ social_media_domain_main_part = [
     'threads', 'linkedin', 'pinterest', 'youtube', 'onetrust', 'amazon', 'reddit', 'wordpress', 'adobe',
     'tiktok', 'snapchat', 'whatsapp', 'quora', 'google', 'github', 'apple', 'vimeo', 'youtu', 'cloudflare', 'goo', 'mozilla', 'maps',
     'example', 'oauth', 'sec', 'researchgate', 'gov', 'microsoft', 'w3', 'wikipedia', 'mozilla', 'qq', 'you', 'jquery', 'shopifycdn', 'shopify', 'fontawesome', 'jsdelivr',
-    'myworkdayjobs', 'applytojob', 'device', 'site', 'q4cdn', 'softonic', 'c212'
+    'myworkdayjobs', 'applytojob', 'device', 'site', 'q4cdn', 'softonic', 'c212', 'gstatic', 'x', 'unpkg', 'hcaptcha'
 ]
 
 llm = AzureChatOpenAI(
@@ -185,7 +186,7 @@ def translate_text(text):
         input_variables=["input_text", "sample_json"],
         template=template,
     )
-
+    time.sleep(3)
     chain = LLMChain(llm=llm, prompt=prompt)
 
     result = chain.run(input_text=text, sample_json=sample_json)

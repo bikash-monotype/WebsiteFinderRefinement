@@ -5,7 +5,7 @@ import os
 from company_structures import get_company_structures, get_links_for_company_structures_for_private_company
 import multiprocessing
 from functools import partial
-from helpers import create_result_directory, extract_domain_name, get_main_domain, process_worker_function, calculate_openai_costs, get_serper_costs
+from helpers import create_result_directory, extract_domain_name, get_main_domain, process_worker_function, calculate_openai_costs, get_serper_costs, pad_list
 from datetime import datetime
 import pandas as pd
 from company_structures_validation import validate_company_structure
@@ -128,36 +128,36 @@ if submit_button:
            
         urls = list(set(urls))
 
-        if len(urls) == 0:
-            st.write("###### No url found for the given company")
+        # if len(urls) == 0:
+        #     st.write("###### No url found for the given company")
 
-            st.write("###### Fetching links for finding company structures for private company")
+        #     st.write("###### Fetching links for finding company structures for private company")
 
-            all_links = get_links_for_company_structures_for_private_company(company_name, log_file_paths['log'])
+        #     all_links = get_links_for_company_structures_for_private_company(company_name, log_file_paths['log'])
 
-            total_cost_USD = calculate_openai_costs(all_links['llm_usage']['prompt_tokens'], all_links['llm_usage']['completion_tokens'])
+        #     total_cost_USD = calculate_openai_costs(all_links['llm_usage']['prompt_tokens'], all_links['llm_usage']['completion_tokens'])
 
-            whole_process_prompt_tokens += all_links['llm_usage']['prompt_tokens']
-            whole_process_completion_tokens += all_links['llm_usage']['completion_tokens']
-            whole_process_llm_costs += total_cost_USD
-            whole_process_serper_credits += all_links['serper_credits']
+        #     whole_process_prompt_tokens += all_links['llm_usage']['prompt_tokens']
+        #     whole_process_completion_tokens += all_links['llm_usage']['completion_tokens']
+        #     whole_process_llm_costs += total_cost_USD
+        #     whole_process_serper_credits += all_links['serper_credits']
 
-            with open(log_file_paths['llm'], 'a') as f:
-                f.write(f"\n\n")
-                f.write(f"Finding links for subsidiaries for private subsidiaries:\n")
-                f.write(f"Total Prompt Tokens: {all_links['llm_usage']['prompt_tokens']}\n")
-                f.write(f"Total Completion Tokens: {all_links['llm_usage']['completion_tokens']}\n")
-                f.write(f"Total Cost in USD: {total_cost_USD}\n")
+        #     with open(log_file_paths['llm'], 'a') as f:
+        #         f.write(f"\n\n")
+        #         f.write(f"Finding links for subsidiaries for private subsidiaries:\n")
+        #         f.write(f"Total Prompt Tokens: {all_links['llm_usage']['prompt_tokens']}\n")
+        #         f.write(f"Total Completion Tokens: {all_links['llm_usage']['completion_tokens']}\n")
+        #         f.write(f"Total Cost in USD: {total_cost_USD}\n")
 
-            with open(log_file_paths['serper'], 'a') as f:
-                f.write("\n\n")
-                f.write(f"Finding links for subsidiaries for private subsidiaries:\n")
-                f.write(f"Total Credits: {all_links['serper_credits']}\n")
-                f.write(f"Total Cost in USD: {get_serper_costs(all_links['serper_credits'])}\n")
+        #     with open(log_file_paths['serper'], 'a') as f:
+        #         f.write("\n\n")
+        #         f.write(f"Finding links for subsidiaries for private subsidiaries:\n")
+        #         f.write(f"Total Credits: {all_links['serper_credits']}\n")
+        #         f.write(f"Total Cost in USD: {get_serper_costs(all_links['serper_credits'])}\n")
 
-            urls = all_links['links']
-        else:
-            print('Running else')
+        #     urls = all_links['links']
+        # else:
+        #     print('Running else')
             # progress_bar = st.progress(0)
             # total_urls = len(urls)
             # progress_step = 1 / total_urls
@@ -203,12 +203,13 @@ if submit_button:
         for entry in results:
             if entry['result']['company_structure'] is not None:
                 company_structure_set.update(entry['result']['company_structure'])
-            
-            for exec_info in entry['exec_info']:
-                if exec_info['node_name'] == 'TOTAL RESULT':
-                    total_prompt_tokens += exec_info.get('prompt_tokens', 0)
-                    total_completion_tokens += exec_info.get('completion_tokens', 0)
-                    total_cost_USD += exec_info.get('total_cost_USD', 0.0)
+
+            if entry['exec_info'] is not None:
+                for exec_info in entry['exec_info']:
+                    if exec_info['node_name'] == 'TOTAL RESULT':
+                        total_prompt_tokens += exec_info.get('prompt_tokens', 0)
+                        total_completion_tokens += exec_info.get('completion_tokens', 0)
+                        total_cost_USD += exec_info.get('total_cost_USD', 0.0)
 
         with open(log_file_paths['llm'], 'a') as f:
             f.write(f"\n\n")
@@ -221,7 +222,17 @@ if submit_button:
         whole_process_completion_tokens += total_completion_tokens
         whole_process_llm_costs += total_cost_USD
 
+        export_df = pd.DataFrame({
+            'Company Structure': list(company_structure_set)
+        })
+
+        export_df.to_excel(os.path.join(final_results_directory, 'company_structures.xlsx'), index=False, header=True)
+
         st.write("###### Validating the subsidiaries")
+
+        export_df = pd.read_excel(os.path.join(final_results_directory, 'company_structures.xlsx'))
+
+        company_structure_set = export_df['Company Structure'].tolist()
         
         valid_subsidiaries = validate_company_structure(company_structure_set, company_name, log_file_paths)
 
@@ -265,6 +276,14 @@ if submit_button:
         whole_process_llm_costs += total_cost_USD
 
         whole_process_serper_credits += valid_subsidiaries['serper_credits']
+
+        export_df = pd.DataFrame(filtered_agents_output_list, columns=['Company Name'])
+
+        export_df.to_excel(os.path.join(final_results_directory, 'filtered_valid_subsidiaries_output_list' + '.xlsx'), index=False, header=True)
+
+        export_df = pd.read_excel(os.path.join(final_results_directory, 'filtered_valid_subsidiaries_output_list' + '.xlsx'))
+
+        filtered_agents_output_list = export_df['Company Name'].tolist()
     
         st.write("###### Finding official websites for the subsidiaries")
         websites = get_official_websites(filtered_agents_output_list, company_name, log_file_paths)
@@ -292,12 +311,16 @@ if submit_button:
 
         export_df.to_excel(os.path.join(final_results_directory, 'website_research_agent' + '.xlsx'), index=False, header=True)
 
+        export_df = pd.read_excel(os.path.join(final_results_directory, 'website_research_agent' + '.xlsx'))
+
+        websites_research_data = export_df['Website URL'].tolist()
+
         st.write("###### Find copyright for the subsidiaries")
 
         unique_urls = set()
 
-        for entry in websites['data']:
-            unique_urls.add(get_main_domain(entry['Website URL'].rstrip('/')))
+        for entry in websites_research_data:
+            unique_urls.add(get_main_domain(entry.rstrip('/')))
 
         copyrights = process_website_and_get_copyrights(unique_urls, log_file_paths)
 
@@ -310,8 +333,8 @@ if submit_button:
             f.write(f"Total Completion Tokens: {copyrights['llm_usage']['completion_tokens']}\n")
             f.write(f"Total Cost in USD: {copyrights['llm_usage']['total_cost_USD']}\n")
 
-        whole_process_prompt_tokens += websites['llm_usage']['prompt_tokens']
-        whole_process_completion_tokens += websites['llm_usage']['completion_tokens']
+        whole_process_prompt_tokens += copyrights['llm_usage']['prompt_tokens']
+        whole_process_completion_tokens += copyrights['llm_usage']['completion_tokens']
         whole_process_llm_costs += total_cost_USD
 
         file_path = os.path.join(final_results_directory, 'website_research_agent.xlsx')
@@ -321,6 +344,8 @@ if submit_button:
         export_df.to_excel(file_path, index=False, header=True)
 
         st.write("###### Find websites using copyright")
+
+        export_df = pd.read_excel(file_path)
 
         data = export_df[['Company Name', 'Copyright']]
         data_cleaned = data.replace('N/A', np.nan).dropna(subset=['Copyright'])
@@ -337,6 +362,14 @@ if submit_button:
 
         df = pd.DataFrame(copyright_research['copyright_results'], columns=['Website URL'])
         df.to_excel(os.path.join(final_results_directory, 'copyright_research_agent' + '.xlsx'), index=False, header=True)
+
+        df = pd.read_excel(os.path.join(final_results_directory, 'website_research_agent' + '.xlsx'))
+        websites_research_data = df['Website URL'].tolist()
+
+        unique_urls = set()
+
+        for entry in websites_research_data:
+            unique_urls.add(get_main_domain(entry.rstrip('/')))
 
         st.write("###### Find websites using domain search")
         domain_research = process_domain_research(unique_urls, log_file_paths)
@@ -357,11 +390,6 @@ if submit_button:
         for url in unique_urls:
             websites_results.add(extract_domain_name(url))
 
-        combined_final_results = websites_results.union(copyright_research['copyright_results']).union(domain_research['domain_search_results'])
-
-        df = pd.DataFrame(combined_final_results, columns=['Website URL'])
-        df.to_excel(os.path.join(final_results_directory, 'combined_final_results' + '.xlsx'), index=False, header=True)
-
         st.write("###### Start Link Grabber")
 
         link_grabber_results = process_link_grabber(unique_urls, log_file_paths)
@@ -369,8 +397,30 @@ if submit_button:
         df = pd.DataFrame(link_grabber_results, columns=['Website URL'])
         df.to_excel(os.path.join(final_results_directory, 'link_grabber_agent' + '.xlsx'), index=False, header=True)
 
+        df = pd.read_excel(os.path.join(final_results_directory, 'copyright_research_agent' + '.xlsx'))
+        copyright_results = set(df['Website URL'].tolist())
+
+        df = pd.read_excel(os.path.join(final_results_directory, 'domain_search_agent' + '.xlsx'))
+        domain_research_results = set(df['Website URL'].tolist())
+
+        df = pd.read_excel(os.path.join(final_results_directory, 'link_grabber_agent' + '.xlsx'))
+        link_grabber_results = set(df['Website URL'].tolist())
+
+        combined_final_results = websites_results.union(copyright_results).union(domain_research_results).union(link_grabber_results)
+
+        df = pd.DataFrame(combined_final_results, columns=['Website URL'])
+        df.to_excel(os.path.join(final_results_directory, 'combined_final_results' + '.xlsx'), index=False, header=True)
+
         st.write('###### Start validation of the domains')
         st.write('###### Remove unreachable, on sale and redirected domains')
+
+        export_df = pd.read_excel(os.path.join(final_results_directory, 'filtered_valid_subsidiaries_output_list' + '.xlsx'))
+
+        filtered_agents_output_list = export_df['Company Name'].tolist()
+
+        df = pd.read_excel(os.path.join(final_results_directory, 'combined_final_results' + '.xlsx'))
+
+        combined_final_results = df['Website URL'].tolist()
 
         response = validate_domains(combined_final_results, company_name, log_file_paths)
 
@@ -380,8 +430,12 @@ if submit_button:
 
         export_df.to_excel(os.path.join(final_results_directory, 'final_invalid_non_working_domains.xlsx'), index=False, header=True)
 
+        max_length = max(len(filtered_agents_output_list), len(response['final_valid_working_domains']))
+
         export_df = pd.DataFrame({
-            'Domains': response['final_valid_working_domains'],
+            'Company Name': pad_list([company_name], max_length),
+            'Subsidiaries': pad_list(filtered_agents_output_list, max_length),
+            'Domains': pad_list(response['final_valid_working_domains'], max_length),
         })
 
         export_df.to_excel(os.path.join(final_results_directory, 'final_output.xlsx'), index=False, header=True)
