@@ -62,11 +62,12 @@ def process_website_and_get_copyrights(websites, log_file_paths):
         else:
             copyrights_dict[website] = "N/A"
 
-        for exec_info in result['exec_info']:
-            if exec_info['node_name'] == 'TOTAL RESULT':
-                total_prompt_tokens += exec_info.get('prompt_tokens', 0)
-                total_completion_tokens += exec_info.get('completion_tokens', 0)
-                total_cost_USD += exec_info.get('total_cost_USD', 0.0)
+        if result['exec_info'] is not None:
+            for exec_info in result['exec_info']:
+                if exec_info['node_name'] == 'TOTAL RESULT':
+                    total_prompt_tokens += exec_info.get('prompt_tokens', 0)
+                    total_completion_tokens += exec_info.get('completion_tokens', 0)
+                    total_cost_USD += exec_info.get('total_cost_USD', 0.0)
 
     return {
         'copyrights': copyrights_dict,
