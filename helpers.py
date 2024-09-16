@@ -171,17 +171,23 @@ def tokenize_text(text):
 
 def translate_text(text):
     sample_json = {
-        'converted_text': 'Converted'
+        'converted_text': 'Converted',
+        'is_translated': 'Yes/No'
     }
     
     template = """
-        You are a language model. 
-        Convert the given google search string according to it's country language.
+        You are a language model.
+        Convert the given Google search string according to its country's language.
 
         Text: {input_text}
 
         Sample Output Format:
         {sample_json}
+
+        Important Notes:
+        1. Identify the country from the provided domain in the search string.
+        2. If the country is identified, convert the search string to the corresponding country's language and set the value of is_translated to value 'Yes'.
+        3. If unable to identify the country from the domain, return the original search string without any modifications and set the value of is_translated to value 'No'.
 
         Important note: Please provide the output in the JSON format as shown above.
     """
@@ -202,6 +208,7 @@ def translate_text(text):
 
     return {
         'converted_text': result['converted_text'],
+        'is_translated': result['is_translated'],
         'prompt_tokens': prompt_tokens,
         'completion_tokens': completion_tokens,
     }

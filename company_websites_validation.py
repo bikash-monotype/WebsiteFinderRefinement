@@ -78,12 +78,14 @@ def validate_working_single_domain(log_file_path, domain):
         print(f"Exception when validating domain using scrapegraph AI: {e}")
         return {'domain': domain, 'isVisitable': 'No', 'reason': 'Exception when validating domain using scrapegraph AI', 'exec_info': None}
     
-def validate_single_correct_domains(log_file_paths, main_company, domain):
+def validate_single_correct_domains(log_file_paths, main_company, all_possible_domains, domain):
     try:
         total_prompt_tokens = 0
         total_completion_tokens = 0
+        total_serper_credits = 0
 
         search_results = search_multiple_page(f"site:{domain} a part of {main_company}?", 10, 1, log_file_path=log_file_paths['log'])
+        total_serper_credits += search_results['serper_credits']
 
         if len(search_results['all_results']) == 0:
             country_specific_domain = is_regional_domain_enhanced(domain)
@@ -91,7 +93,17 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
             if country_specific_domain is True:
                 translate_search_string = translate_text(f"site:{domain} a part of {main_company}?")
 
-                search_results = search_multiple_page(translate_search_string['converted_text'], 10, 1, log_file_path=log_file_paths['log'])
+                if translate_search_string['is_translated'] == 'Yes':
+                    search_results = search_multiple_page(translate_search_string['converted_text'], 10, 1, log_file_path=log_file_paths['log'])
+                    total_serper_credits += search_results['serper_credits']
+
+            if len(search_results['all_results']) == 0:
+                for possible_domain in all_possible_domains:
+                    search_results = search_multiple_page(f'site:{possible_domain} "{domain}"', 10, 1, log_file_path=log_file_paths['log'])
+                    total_serper_credits += search_results['serper_credits']
+
+                    if len(search_results['all_results']) > 0:
+                        break
 
                 if len(search_results['all_results']) == 0:
                     return {
@@ -100,18 +112,9 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
                             'prompt_tokens': 0,
                             'completion_tokens': 0
                         },
-                        'serper_credits': search_results['serper_credits']
+                        'serper_credits': total_serper_credits
                     }
-            else:
-                return {
-                    'results': [domain, 'No'],
-                    'llm_usage': {
-                        'prompt_tokens': 0,
-                        'completion_tokens': 0
-                    },
-                    'serper_credits': search_results['serper_credits']
-                }
-
+      
         domain_company_validation_researcher = Agent(
             role='Domain Relationship Analyst',
             goal='Validate the relationship between {domain} and {main_company}, assessing whether the domain is officially affiliated with the company. This includes investigating domain ownership, brand association, legal or business affiliations, and any partnerships or acquisitions involving the domain and the company.',
@@ -121,6 +124,9 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
             backstory=(
                 """
                 As an expert in domain ownership and corporate affiliations, you specialize in identifying the connections between domains and companies. You excel at conducting thorough research using official sources like WHOIS records, company websites, press releases, and legal documents to verify domain ownership and affiliations.
+                
+                **Important:** You are also adept at distinguishing domains that merely provide reports, news, or third-party information about the company, as well as those that sell the company's products without any official affiliation. Such domains should be excluded unless there is clear evidence of an official partnership, ownership, or affiliation.
+                
                 Your findings are grounded in verifiable data, ensuring that each conclusion about the relationship between a domain and a company is backed by solid, authoritative evidence. You prioritize clarity and accuracy, providing stakeholders with trustworthy information on domain affiliations.
                 In your role, you document the findings in a manner that is easy to understand and verify, making sure that all relationships are clearly defined and backed by strong evidence.
                 """
@@ -141,11 +147,14 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
                 3. Brand or sub-brand
                 4. Acquisition or partnership
 
+                **Exclusions:**
+                - If the domain is **for sale**, return 'No'.
+                - If the domain **only provides reports, news, reviews, or third-party information** about the company without any direct ownership or official partnership, return 'No'.
+                - If the domain **sells products produced by the company** but **is not officially affiliated** (e.g., not an authorized retailer or official store), return 'No'.
+
                 Focus on clear evidence of association, using both exact and partial matches. Consider the context and relationships described.
 
-                **Note:** If the domain is **for sale**, return 'No'
-
-                If the relationship is valid, return 'Yes'. If not, return 'No'
+                If the relationship is valid, return 'Yes'. If not, return 'No'.
 
                 Only use information from the search results. Avoid assumptions.
 
@@ -166,6 +175,7 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
                 Domain Relationship Analyst.
                 Validate the relationship between {domain} and {main_company}, assessing whether the domain is officially affiliated with the company. This includes investigating domain ownership, brand association, legal or business affiliations, and any partnerships or acquisitions involving the domain and the company.
                 As an expert in domain ownership and corporate affiliations, you specialize in identifying the connections between domains and companies. You excel at conducting thorough research using official sources like WHOIS records, company websites, press releases, and legal documents to verify domain ownership and affiliations.
+                **Important:** You are also adept at distinguishing domains that merely provide reports, news, or third-party information about the company, as well as those that sell the company's products without any official affiliation. Such domains should be excluded unless there is clear evidence of an official partnership, ownership, or affiliation.
                 Your findings are grounded in verifiable data, ensuring that each conclusion about the relationship between a domain and a company is backed by solid, authoritative evidence. You prioritize clarity and accuracy, providing stakeholders with trustworthy information on domain affiliations.
                 In your role, you document the findings in a manner that is easy to understand and verify, making sure that all relationships are clearly defined and backed by strong evidence.
                 
@@ -180,11 +190,14 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
                 3. Brand or sub-brand
                 4. Acquisition or partnership
 
+                **Exclusions:**
+                - If the domain is **for sale**, return 'No'.
+                - If the domain **only provides reports, news, reviews, or third-party information** about the company without any direct ownership or official partnership, return 'No'.
+                - If the domain **sells products produced by the company** but **is not officially affiliated** (e.g., not an authorized retailer or official store), return 'No'.
+
                 Focus on clear evidence of association, using both exact and partial matches. Consider the context and relationships described.
 
-                **Note:** If the domain is **for sale**, return 'No'
-
-                If the relationship is valid, return 'Yes'. If not, return 'No'
+                If the relationship is valid, return 'Yes'. If not, return 'No'.
 
                 Only use information from the search results. Avoid assumptions.
 
@@ -235,11 +248,11 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
                 'prompt_tokens': llm_usage['prompt_tokens'],
                 'completion_tokens': llm_usage['completion_tokens']
             },
-            'serper_credits': search_results['serper_credits']
+            'serper_credits': total_serper_credits
         }
     except Exception as e:
         with open(log_file_paths['log'], 'a') as f:
-            f.write(f"Exception when validating domain using crew AI: {e}")
+            f.write(f"Exception when validating {domain} using crew AI: {e}")
         return {'results': [domain, 'No'], 'llm_usage': {'prompt_tokens': 0, 'completion_tokens': 0}, 'serper_credits': 0}
 
 def validate_working_domains(domains, log_file_path):
@@ -290,8 +303,10 @@ def validate_working_domains(domains, log_file_path):
         'total_cost_USD': total_cost_USD
     }
 
-def validate_domains(domains, main_company, log_file_path):
+def validate_domains(domains, main_company, all_possible_websites, log_file_path):
     domains = [value for value in domains if not pd.isna(value) and isinstance(value, str) and value != "." and extract_main_part(value) not in social_media_domain_main_part]
+    
+    all_possible_domains = [extract_domain_name(url) for url in all_possible_websites]
 
     total_prompt_tokens = 0
     total_completion_tokens = 0
@@ -307,7 +322,7 @@ def validate_domains(domains, main_company, log_file_path):
     total_domains = len(domains)
     progress_step = 1 / total_domains
 
-    validate_single_correct_domains_with_log = partial(validate_single_correct_domains, log_file_path, main_company)
+    validate_single_correct_domains_with_log = partial(validate_single_correct_domains, log_file_path, main_company, all_possible_domains)
 
     serialized_function = dill.dumps(validate_single_correct_domains_with_log)
 
