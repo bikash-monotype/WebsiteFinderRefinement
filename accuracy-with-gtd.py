@@ -74,7 +74,12 @@ if uploaded_file is not None and link_grabber_file is not None and company_name 
         for data in link_grabber_data:
             for main_domain, domains in data.items():
                 if main_domain in response['valid_working_domains']:
-                    filtered_link_grabber_data[main_domain] = domains
+                    for domain in domains:
+                        if domain not in response['valid_working_domains']:
+                            if main_domain in filtered_link_grabber_data:
+                                filtered_link_grabber_data[main_domain].append(domain)
+                            else:
+                                filtered_link_grabber_data[main_domain] = [domain]
 
         response2 = validate_linkgrabber_domains(filtered_link_grabber_data, log_file_paths)
 
