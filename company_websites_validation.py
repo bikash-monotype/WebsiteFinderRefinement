@@ -11,9 +11,11 @@ import dill
 from helpers import process_worker_function, extract_domain_name, is_working_domain, is_regional_domain_enhanced, translate_text, chunk_list, extract_main_part, social_media_domain_main_part
 from tools import search_multiple_page
 import json_repair
-from helpers import calculate_openai_costs, tokenize_text
+from helpers import calculate_openai_costs, tokenize_text, get_all_links
 import time
 import pandas as pd
+import json
+
 load_dotenv()
 
 os.environ['AZURE_OPENAI_ENDPOINT'] = os.getenv('AZURE_OPENAI_ENDPOINT')
@@ -290,7 +292,154 @@ def validate_working_domains(domains, log_file_path):
         'total_cost_USD': total_cost_USD
     }
 
-def validate_domains(domains, main_company, log_file_path):
+def validate_single_correct_linkgrabber_domains(log_file_paths, domain_key_value):
+    main_domain, domain = domain_key_value
+    total_serper_credits = 0
+
+    search_results = search_multiple_page(f"site:{main_domain} {domain}", 10, 1, log_file_path=log_file_paths['log'])
+    total_serper_credits += search_results['serper_credits']
+
+    if len(search_results['all_results']) == 0:
+        return {
+            'main_domain': main_domain,
+            'domain': domain,
+            'valid': 'False',
+            'reason': 'Zero search results',
+            'graph_exec_info': None,
+            'total_serper_credits': total_serper_credits
+        }
+    
+    try :
+        sample_json_output = json.dumps({'valid': 'True/False', 'reason': 'Reason for True or False value'})
+        prompt = (
+            f"""
+                Determine whether the specific domain is present on the given website and is legitimately associated with the website's company through subsidiaries, brands, partnerships, or other formal relationships. 
+                Exclude any instances where the domain appears solely as a third-party tool, service, payment service, or advertisement without any formal association.
+
+                ---
+                **Input Details:**
+                **Tasks:**
+                1. **Presence Verification:**
+                - Check if the specified domain (`{domain}`) is present anywhere on the website (`{main_domain}`).
+
+                2. **Association Assessment:**
+                - Determine if the domain is associated with the company owning the website in any of the following capacities:
+                    - **Subsidiaries:** Is the domain part of a subsidiary company?
+                    - **Brands:** Does the domain represent a brand under the company's umbrella?
+                    - **Partners:** Is the domain linked through a partnership or collaboration?
+                    - **Other Formal Relationships:** Any other official associations (e.g., joint ventures, franchises).
+
+                3. **Exclusion Criteria:**
+                - Identify if the domain is present **only** as a third-party tool, service, payment service or advertisement without any formal association with the company.
+
+                **Output Format:**
+                {sample_json_output}
+            """
+        )
+        
+        smart_scraper_graph = SmartScraperGraph(
+            prompt=prompt,
+            source=search_results['all_results'][0]['link'],
+            config=graph_config,
+        )
+
+        result = smart_scraper_graph.run()
+        graph_exec_info = smart_scraper_graph.get_execution_info()
+
+        return {
+            'main_domain': main_domain,
+            'domain': domain,
+            'reason': result['reason'],
+            'valid': result['valid'],
+            'graph_exec_info': graph_exec_info,
+            'total_serper_credits': total_serper_credits
+        }
+    except Exception as e:
+        with open(log_file_paths['log'], 'a') as f:
+            f.write(f"Exception when validating domain using scrapegraph AI: {e}")
+        print(f"Exception when validating domain using scrapegraph AI: {e}")
+        return {
+            'main_domain': main_domain,
+            'domain': domain,
+            'valid': 'False',
+            'reason': f'Exception when validating domain using scrapegraph AI: {e}',
+            'graph_exec_info': None,
+            'total_serper_credits': total_serper_credits
+        }
+
+def validate_linkgrabber_domains(domains, log_file_path):
+    domains_key_value = []
+
+    for main_domain, value in domains.items():
+        for domain in value:
+            if domain != value and not pd.isna(domain) and isinstance(domain, str) and domain != "." and extract_main_part(domain) not in social_media_domain_main_part:
+                domains_key_value.append((main_domain, domain))
+
+    progress_bar = st.progress(0)
+    total_domains = len(domains_key_value)
+    progress_step = 1 / total_domains
+
+    validate_single_correct_domains_with_log = partial(validate_single_correct_linkgrabber_domains, log_file_path)
+
+    serialized_function = dill.dumps(validate_single_correct_domains_with_log)
+
+    chunk_size = 15
+    results = []
+
+    total_prompt_tokens = 0
+    total_completion_tokens = 0
+    total_cost_USD = 0.0
+    total_serper_credits = 0
+
+    valid_working_domains = set()
+    invalid_non_working_domains = set()
+
+    with multiprocessing.Pool(processes=20) as pool:
+        for chunk in chunk_list(domains_key_value, chunk_size):
+            chunk_results = pool.map(partial(process_worker_function, serialized_function), chunk)
+            results.extend(chunk_results)
+            progress_bar.progress(min((len(results) + 1) * progress_step, 1.0))
+
+    validation_domain_with_reason = []
+
+    for res in results:
+        validation_domain_with_reason.append([res['main_domain'], res['domain'], res['valid'], res['reason']])
+
+        if res['valid'] == 'True':
+            valid_working_domains.add(res['domain'])
+        else:
+            invalid_non_working_domains.add(res['domain'])
+
+        total_serper_credits += res['total_serper_credits']
+
+        if res['graph_exec_info'] is not None:
+            for exec_info in res['graph_exec_info']:
+                if exec_info['node_name'] == 'TOTAL RESULT':
+                    total_prompt_tokens += exec_info.get('prompt_tokens', 0)
+                    total_completion_tokens += exec_info.get('completion_tokens', 0)
+                    total_cost_USD += exec_info.get('total_cost_USD', 0.0)
+
+    with open(log_file_path['llm'], 'a') as f:
+        f.write('Validate linkgrabber domains')
+        f.write(f"Total prompt tokens: {total_prompt_tokens}\n")
+        f.write(f"Total completion tokens: {total_completion_tokens}\n")
+        f.write(f"Total cost: {total_cost_USD}\n")
+
+    with open(log_file_path['serper'], 'a') as f:
+        f.write('Validate linkgrabber domains')
+        f.write(f"Total Credits: {total_serper_credits}\n")
+
+    return {
+        'link_grabber_validation_AI_responses': validation_domain_with_reason,
+        'valid_working_domains': list(valid_working_domains),
+        'invalid_non_working_domains': list(invalid_non_working_domains),
+        'total_prompt_tokens': total_prompt_tokens,
+        'total_completion_tokens': total_completion_tokens,
+        'total_cost_USD': total_cost_USD,
+        'total_serper_credits': total_serper_credits
+    }
+
+def validate_agentsOutput_domains(domains, main_company, log_file_path):
     domains = [value for value in domains if not pd.isna(value) and isinstance(value, str) and value != "." and extract_main_part(value) not in social_media_domain_main_part]
 
     total_prompt_tokens = 0
@@ -367,8 +516,8 @@ def validate_domains(domains, main_company, log_file_path):
 
     return {
         # 'invalid_non_working_domains': invalid_non_working_domains,
-        'final_valid_working_domains': list(valid_working_domains),
-        'final_invalid_non_working_domains': list(invalid_non_working_domains),
+        'valid_working_domains': list(valid_working_domains),
+        'invalid_non_working_domains': list(invalid_non_working_domains),
         'total_prompt_tokens': total_prompt_tokens + total_prompt_tokens2,
         'total_completion_tokens': total_completion_tokens + total_completion_tokens2,
         'total_cost_USD': total_cost_USD,

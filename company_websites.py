@@ -268,8 +268,6 @@ def process_link_grabber(website_urls, log_file_paths):
     progress_bar = st.progress(0)
     progress_step = 1 / total_urls
 
-    link_grabber_results = set()
-
     get_links_with_log_file = partial(get_links, log_file_path=log_file_paths['log'])
 
     serialized_function = dill.dumps(get_links_with_log_file)
@@ -280,11 +278,7 @@ def process_link_grabber(website_urls, log_file_paths):
             results.append(result)
             progress_bar.progress((i + 1) * progress_step)
 
-    for result in results:
-        for link in list(result):
-            link_grabber_results.add(extract_domain_name(link))
-
-    return link_grabber_results
+    return results
 
 def process_single_copyright_research(row, log_file_paths):
     company_name = row['Company Name']

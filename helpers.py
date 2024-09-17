@@ -265,14 +265,20 @@ def extract_year(copyright_text):
 
 def get_links(url, log_file_path):
     fin = set()
+
+    if not url.startswith('http://') and not url.startswith('https://'):
+        url = f'https://{url}'
+
     results = get_all_links(url, log_file_path)
 
     if isinstance(results, list):
         for item in results:
             if validators.url(item) and not is_social_media_link(item):
-                fin.add(item)
+                fin.add(extract_domain_name(item))
 
-    return fin
+    return {
+        extract_domain_name(url): list(fin)
+    }
 
 def get_all_links(url, log_file_path):
     print(url)
@@ -284,10 +290,10 @@ def get_all_links(url, log_file_path):
             try:
                 browser = p.chromium.launch(headless=False, args=['--disable-http2'])
                 page = browser.new_page()
-                page.goto(url, timeout=120000)
+                page.goto(url, timeout=100000)
                 
                 page.wait_for_load_state('load')
-                time.sleep(10)
+                time.sleep(8)
 
                 links = page.eval_on_selector_all("[href]", "elements => elements.map(el => el.href)")
                 break

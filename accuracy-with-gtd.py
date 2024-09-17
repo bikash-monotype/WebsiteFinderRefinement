@@ -3,20 +3,26 @@ import pandas as pd
 from datetime import datetime
 from helpers import create_result_directory, extract_domain_name, pad_list, social_media_domain_main_part, extract_main_part
 import os
-from company_websites_validation import validate_domains, validate_working_domains
+from company_websites_validation import validate_agentsOutput_domains, validate_working_domains, validate_linkgrabber_domains
+import json
 
-st.title("Accuracy check without GTD")
+st.title("Accuracy check with GTD")
 
 uploaded_file = st.file_uploader("Choose a file", type=["csv", "xlsx"])
 
+link_grabber_file = st.file_uploader("Choose a file for link grabber", type=["json"])
+
 company_name = st.text_input("Enter company name")
 
-if uploaded_file is not None and company_name is not None:
+if uploaded_file is not None and link_grabber_file is not None and company_name is not None:
     if uploaded_file.name.endswith('.csv'):
         df = pd.read_csv(uploaded_file)
     else:
         df = pd.read_excel(uploaded_file)
 
+    if link_grabber_file.name.endswith('.json'):
+        link_grabber_data = json.load(link_grabber_file)
+    
     if st.button("Process File"):
         print("Processing file...")
         start_time = datetime.now()
@@ -55,13 +61,47 @@ if uploaded_file is not None and company_name is not None:
             </div>
         """, unsafe_allow_html=True)
 
-        response = validate_domains(agentsOutput, company_name, log_file_paths)
+        response = validate_agentsOutput_domains(agentsOutput, company_name, log_file_paths)
 
-        st.write('###### Validate Ground Truth')
+        export_df = pd.DataFrame({
+            'Domains': response['invalid_non_working_domains'],
+        })
+
+        export_df.to_excel(os.path.join(final_results_directory, 'invalid_non_working_domains_excluding_linkgrabber.xlsx'), index=False, header=True)
+
+        filtered_link_grabber_data = {}
+
+        for data in link_grabber_data:
+            for main_domain, domains in data.items():
+                if main_domain in response['valid_working_domains']:
+                    filtered_link_grabber_data[main_domain] = domains
+
+        response2 = validate_linkgrabber_domains(filtered_link_grabber_data, log_file_paths)
+
+        export_df = pd.DataFrame(response2['link_grabber_validation_AI_responses'], columns=['Main Domain', 'Domain', 'AI Response', 'Reason'])
+
+        export_df.to_excel(os.path.join(final_results_directory, 'link_grabber_validation_AI_responses.xlsx'), index=False, header=True)
+
+        export_df.to_excel(os.path.join(final_results_directory, 'invalid_non_working_domains_of_linkgrabber.xlsx'), index=False, header=True)
+
+        export_df = pd.DataFrame({
+            'Domains': response2['invalid_non_working_domains'],
+        })
+
+        export_df.to_excel(os.path.join(final_results_directory, 'invalid_non_working_domains_of_linkgrabber.xlsx'), index=False, header=True)
+
+        valid_domains = set(response['valid_working_domains'] + response2['valid_working_domains'])
+
+        # st.write('###### Validate Ground Truth')
 
         # response2 = validate_working_domains(gtd, log_file_paths)
 
         # valid_gtd = response2['valid_working_domains']
+
+        whole_process_prompt_tokens += response2['total_prompt_tokens']
+        whole_process_completion_tokens += response2['total_completion_tokens']
+        whole_process_llm_costs += response2['total_cost_USD']
+        whole_process_serper_credits += response2['total_serper_credits']
 
         whole_process_prompt_tokens += response['total_prompt_tokens']
         whole_process_completion_tokens += response['total_completion_tokens']
@@ -86,12 +126,6 @@ if uploaded_file is not None and company_name is not None:
 
         # export_df.to_excel(os.path.join(final_results_directory, 'invalid_gtd.xlsx'), index=False, header=True)
 
-        export_df = pd.DataFrame({
-            'Domains': response['final_invalid_non_working_domains'],
-        })
-
-        export_df.to_excel(os.path.join(final_results_directory, 'final_invalid_non_working_domains.xlsx'), index=False, header=True)
-
         with open(log_file_paths['serper'], 'a') as f:
             f.write("\n\n")
             f.write(f"Validation domains.\n")
@@ -111,18 +145,18 @@ if uploaded_file is not None and company_name is not None:
 
         endtime = datetime.now() - start_time
 
-        common_values = set(gtd).intersection(response['final_valid_working_domains'])
+        common_values = set(gtd).intersection(valid_domains)
         common_values = list(common_values)
         
-        missing_values_in_gtd = set(gtd).difference(response['final_valid_working_domains'])
+        missing_values_in_gtd = set(gtd).difference(valid_domains)
         missing_values_in_gtd = list(missing_values_in_gtd)
         
-        new_values_in_valid_output = set(response['final_valid_working_domains']).difference(gtd)
+        new_values_in_valid_output = set(valid_domains).difference(gtd)
         new_values_in_valid_output = list(new_values_in_valid_output)
         
         accuracy = ((len(common_values) + len(new_values_in_valid_output)) / (len(gtd) + len(new_values_in_valid_output))) * 100
 
-        max_length = max(len(gtd), len(agentsOutput), len(new_values_in_valid_output), len(gtd), len(common_values))
+        max_length = max(len(agentsOutput), len(new_values_in_valid_output), len(gtd), len(common_values), len(valid_domains), len(missing_values_in_gtd))
         # max_length = max(len(agentsOutput))
 
         res_data = {
@@ -131,7 +165,7 @@ if uploaded_file is not None and company_name is not None:
             # 'Valid GTD': [len(valid_gtd)],
             # "Invalid GTD":[len(list(response2['invalid_non_working_domains'].keys()))],
             'AgentsOutput': [len(agentsOutput)],
-            'Valid AgentsOutput': [len(list(response['final_valid_working_domains']))],
+            'Valid AgentsOutput': [len(list(valid_domains))],
             'Common Values': [len(common_values)],
             'Missing Values from GTD':[len(missing_values_in_gtd)],
             'New Values in Valid Output':[len(new_values_in_valid_output)],
@@ -149,7 +183,7 @@ if uploaded_file is not None and company_name is not None:
         # valid_gtd = pad_list(valid_gtd, max_length)
         # invalid_gtd = pad_list(list(response2['invalid_non_working_domains'].keys()), max_length)
         agentsOutput = pad_list(agentsOutput, max_length)
-        valid_agentsOutput = pad_list(list(response['final_valid_working_domains']), max_length)
+        valid_agentsOutput = pad_list(list(valid_domains), max_length)
         common_values = pad_list(common_values, max_length)
         missing_values_in_gtd = pad_list(missing_values_in_gtd, max_length)
         new_values_in_valid_output = pad_list(new_values_in_valid_output, max_length)
