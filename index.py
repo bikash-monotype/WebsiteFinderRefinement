@@ -12,7 +12,8 @@ from company_structures_validation import validate_company_structure
 from company_websites import get_official_websites, process_website_and_get_copyrights, process_copyright_research, process_domain_research, process_link_grabber
 import dill
 import numpy as np
-from company_websites_validation import validate_domains
+from company_websites_validation import validate_agentsOutput_domains, validate_linkgrabber_domains
+import json
 
 load_dotenv()
 
@@ -390,12 +391,18 @@ if submit_button:
         for url in unique_urls:
             websites_results.add(extract_domain_name(url))
 
+        grabbed_link_domain_lists = set()
+
         st.write("###### Start Link Grabber")
 
         link_grabber_results = process_link_grabber(unique_urls, log_file_paths)
 
-        df = pd.DataFrame(link_grabber_results, columns=['Website URL'])
-        df.to_excel(os.path.join(final_results_directory, 'link_grabber_agent' + '.xlsx'), index=False, header=True)
+        for data in link_grabber_results:
+            for main_domain, domains in data.items():
+                grabbed_link_domain_lists.update(domains)
+
+        with open(os.path.join(final_results_directory, 'link_grabber_agent.json'), 'w') as json_file:
+            json.dump(link_grabber_results, json_file, indent=4)
 
         df = pd.read_excel(os.path.join(final_results_directory, 'copyright_research_agent' + '.xlsx'))
         copyright_results = set(df['Website URL'].tolist())
@@ -403,13 +410,10 @@ if submit_button:
         df = pd.read_excel(os.path.join(final_results_directory, 'domain_search_agent' + '.xlsx'))
         domain_research_results = set(df['Website URL'].tolist())
 
-        df = pd.read_excel(os.path.join(final_results_directory, 'link_grabber_agent' + '.xlsx'))
-        link_grabber_results = set(df['Website URL'].tolist())
+        combined_final_results_excluding_link_grabber = websites_results.union(copyright_results).union(domain_research_results).union(grabbed_link_domain_lists)
 
-        combined_final_results = websites_results.union(copyright_results).union(domain_research_results).union(link_grabber_results)
-
-        df = pd.DataFrame(combined_final_results, columns=['Website URL'])
-        df.to_excel(os.path.join(final_results_directory, 'combined_final_results' + '.xlsx'), index=False, header=True)
+        df = pd.DataFrame(combined_final_results_excluding_link_grabber, columns=['Website URL'])
+        df.to_excel(os.path.join(final_results_directory, 'combined_final_results_excluding_link_grabber' + '.xlsx'), index=False, header=True)
 
         st.write('###### Start validation of the domains')
         st.write('###### Remove unreachable, on sale and redirected domains')
@@ -418,37 +422,27 @@ if submit_button:
 
         filtered_agents_output_list = export_df['Company Name'].tolist()
 
-        df = pd.read_excel(os.path.join(final_results_directory, 'combined_final_results' + '.xlsx'))
+        df = pd.read_excel(os.path.join(final_results_directory, 'combined_final_results_excluding_link_grabber' + '.xlsx'))
 
-        combined_final_results = df['Website URL'].tolist()
+        combined_final_results_excluding_link_grabber = df['Website URL'].tolist()
 
-        response = validate_domains(combined_final_results, company_name, log_file_paths)
-
-        export_df = pd.DataFrame({
-            'Domains': response['final_invalid_non_working_domains'],
-        })
-
-        export_df.to_excel(os.path.join(final_results_directory, 'final_invalid_non_working_domains.xlsx'), index=False, header=True)
-
-        max_length = max(len(filtered_agents_output_list), len(response['final_valid_working_domains']))
+        response = validate_agentsOutput_domains(combined_final_results_excluding_link_grabber, company_name, log_file_paths)
 
         export_df = pd.DataFrame({
-            'Company Name': pad_list([company_name], max_length),
-            'Subsidiaries': pad_list(filtered_agents_output_list, max_length),
-            'Domains': pad_list(response['final_valid_working_domains'], max_length),
+            'Domains': response['invalid_non_working_domains'],
         })
 
-        export_df.to_excel(os.path.join(final_results_directory, 'final_output.xlsx'), index=False, header=True)
+        export_df.to_excel(os.path.join(final_results_directory, 'invalid_non_working_domains_excluding_linkgrabber.xlsx'), index=False, header=True)
 
         with open(log_file_paths['serper'], 'a') as f:
             f.write("\n\n")
-            f.write(f"Validation domains.\n")
+            f.write(f"Validation domains excluding link grabber.\n")
             f.write(f"Total Credits: {response['total_serper_credits']}\n")
             f.write(f"Total Cost in USD: {get_serper_costs(response['total_serper_credits'])}\n")
 
         with open(log_file_paths['llm'], 'a') as f:
             f.write("\n\n")
-            f.write(f"Validating domains:\n")
+            f.write(f"Validating domains excluding link grabber:\n")
             f.write(f"Total Prompt Tokens: {response['total_prompt_tokens']}\n")
             f.write(f"Total Completion Tokens: {response['total_completion_tokens']}\n")
             f.write(f"Total Cost in USD: {response['total_cost_USD']}\n")
@@ -457,6 +451,72 @@ if submit_button:
         whole_process_completion_tokens += response['total_completion_tokens']
         whole_process_llm_costs += response['total_cost_USD']
         whole_process_serper_credits += response['total_serper_credits']
+
+        link_grabber_file = open(os.path.join(final_results_directory, 'link_grabber_agent.json'), "r")
+
+        link_grabber_data = json.load(link_grabber_file)
+
+        filtered_link_grabber_data = {}
+
+        for data in link_grabber_data:
+            for main_domain, domains in data.items():
+                if main_domain in response['valid_working_domains']:
+                    for domain in domains:
+                        if domain not in response['valid_working_domains']:
+                            if main_domain in filtered_link_grabber_data:
+                                filtered_link_grabber_data[main_domain].append(domain)
+                            else:
+                                filtered_link_grabber_data[main_domain] = [domain]
+
+        response2 = validate_linkgrabber_domains(filtered_link_grabber_data, log_file_paths)
+
+        export_df = pd.DataFrame(response2['link_grabber_validation_AI_responses'], columns=['Main Domain', 'Domain', 'AI Response', 'Reason'])
+
+        export_df.to_excel(os.path.join(final_results_directory, 'link_grabber_validation_AI_responses.xlsx'), index=False, header=True)
+
+        export_df.to_excel(os.path.join(final_results_directory, 'invalid_non_working_domains_of_linkgrabber.xlsx'), index=False, header=True)
+
+        export_df = pd.DataFrame({
+            'Domains': response2['invalid_non_working_domains'],
+        })
+
+        export_df.to_excel(os.path.join(final_results_directory, 'invalid_non_working_domains_of_linkgrabber.xlsx'), index=False, header=True)
+
+        with open(log_file_paths['serper'], 'a') as f:
+            f.write("\n\n")
+            f.write(f"Validation link grabber domains.\n")
+            f.write(f"Total Credits: {response2['total_serper_credits']}\n")
+            f.write(f"Total Cost in USD: {get_serper_costs(response2['total_serper_credits'])}\n")
+
+        with open(log_file_paths['llm'], 'a') as f:
+            f.write("\n\n")
+            f.write(f"Validating link grabber domains:\n")
+            f.write(f"Total Prompt Tokens: {response2['total_prompt_tokens']}\n")
+            f.write(f"Total Completion Tokens: {response2['total_completion_tokens']}\n")
+            f.write(f"Total Cost in USD: {response2['total_cost_USD']}\n")
+
+        print('Iam here 1')
+
+        whole_process_prompt_tokens += response2['total_prompt_tokens']
+        whole_process_completion_tokens += response2['total_completion_tokens']
+        whole_process_llm_costs += response2['total_cost_USD']
+        whole_process_serper_credits += response2['total_serper_credits']
+
+        print('Iam here 2')
+
+        valid_domains = set(response['valid_working_domains']).union(response2['valid_working_domains'])
+
+        print('Iam here 3')
+
+        max_length = max(len(filtered_agents_output_list), len(list(valid_domains)))
+
+        export_df = pd.DataFrame({
+            'Company Name': pad_list([company_name], max_length),
+            'Subsidiaries': pad_list(filtered_agents_output_list, max_length),
+            'Domains': pad_list(list(valid_domains), max_length),
+        })
+
+        export_df.to_excel(os.path.join(final_results_directory, 'final_output.xlsx'), index=False, header=True)
 
         st.write(f"Total Prompt Tokens: {whole_process_prompt_tokens}")
         st.write(f"Total Completion Tokens: {whole_process_completion_tokens}")
