@@ -128,6 +128,11 @@ if submit_button:
            
         urls = list(set(urls))
 
+        with open(log_file_paths['links'], 'a') as f:
+            f.write(f"\n\n")
+            f.write(f"All Urls Response:\n")
+            f.write(f"{str(urls)}\n")
+
         # if len(urls) == 0:
         #     st.write("###### No url found for the given company")
 
