@@ -74,7 +74,7 @@ def validate_working_single_domain(log_file_path, domain):
         }
     except Exception as e:
         with open(log_file_path['log'], 'a') as f:
-            f.write(f"Exception when validating domain using scrapegraph AI: {e}")
+            f.write(f"Exception when validating domain using scrapegraph AI: {e}, , Url is {domain}")
         print(f"Exception when validating domain using scrapegraph AI: {e}")
         return {'domain': domain, 'isVisitable': 'No', 'reason': 'Exception when validating domain using scrapegraph AI', 'exec_info': None}
     

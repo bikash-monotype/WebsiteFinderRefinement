@@ -94,7 +94,7 @@ def get_links_for_company_structures(main_company, log_file_path, url):
         }
     except Exception as e:
         with open(log_file_path['log'], 'a') as f:
-            f.write(f"Exception when getting links for company structures using Scrapegraph AI: {e}")
+            f.write(f"Exception when getting links for company structures using Scrapegraph AI: {e}, Url is {url}")
         print(f"Exception when getting links for company structures using Scrapegraph AI: {e}")
         return {'result': {'company_structure': None}, 'exec_info': None}
 
@@ -502,7 +502,7 @@ def get_company_structures(main_company, log_file_path, url):
         }
     except Exception as e:
         with open(log_file_path['log'], 'a') as f:
-            f.write(f"Exception when getting company structures using Scrapegraph AI: {e}")
+            f.write(f"Exception when getting company structures using Scrapegraph AI: {e}. Url is {url}")
         print(f"Exception when getting company structures using Scrapegraph AI: {e}")
         return {'result': {'company_structure': None}, 'exec_info': None}
 
