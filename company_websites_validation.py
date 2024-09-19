@@ -374,7 +374,7 @@ def validate_domains_that_are_considered_correct_by_llm_in_google_search(url, ma
                 **Classification Criteria:**
 
                 1 **Ownership and Affiliation:**
-                - **Primary Criterion:** Determine if the website is **owned, operated, or directly affiliated** with the company. Affiliation can be through subsidiaries, brands, or partnerships.
+                - **Primary Criterion:** Determine if the website is **owned, operated, or directly affiliated** with the company. Affiliation can be through subsidiaries, brands, partnerships and acquisitions.
                 - **Indicators of Ownership/Affiliation:**
                     - **Copyright Information:** Presence of copyright notices indicating ownership by the company. Note that copyright information may be partially matched.
                     - **About Us/Corporate Information:** Sections detailing the company's ownership or partnership status.
