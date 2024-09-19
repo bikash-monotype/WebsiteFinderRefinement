@@ -8,7 +8,7 @@ import multiprocessing
 import streamlit as st
 from functools import partial
 import dill
-from helpers import process_worker_function, extract_domain_name, is_working_domain, is_regional_domain_enhanced, translate_text, chunk_list, extract_main_part, social_media_domain_main_part
+from helpers import process_worker_function, extract_domain_name, is_working_domain, is_regional_domain_enhanced, translate_text, chunk_list, extract_main_part, social_media_domain_main_part, get_netloc
 from tools import search_multiple_page
 import json_repair
 from helpers import calculate_openai_costs, tokenize_text, get_all_links
@@ -82,34 +82,64 @@ def validate_working_single_domain(log_file_path, domain):
     
 def validate_single_correct_domains(log_file_paths, main_company, domain):
     try:
-        total_prompt_tokens = 0
-        total_completion_tokens = 0
+        total_serper_credits = 0
+
+        total_prompt_tokens2 = 0
+        total_completion_tokens2 = 0
+        total_cost_USD2 = 0
 
         search_results = search_multiple_page(f"site:{domain} a part of {main_company}?", 10, 1, log_file_path=log_file_paths['log'])
-
+        total_serper_credits += search_results['serper_credits']
+        
         if len(search_results['all_results']) == 0:
             country_specific_domain = is_regional_domain_enhanced(domain)
 
             if country_specific_domain is True:
                 translate_search_string = translate_text(f"site:{domain} a part of {main_company}?")
 
-                search_results = search_multiple_page(translate_search_string['converted_text'], 10, 1, log_file_path=log_file_paths['log'])
+                if translate_search_string['is_translated'] == 'Yes':
+                    search_results = search_multiple_page(translate_search_string['converted_text'], 10, 1, log_file_path=log_file_paths['log'])
+                    total_serper_credits += search_results['serper_credits']
 
-                if len(search_results['all_results']) == 0:
+                    if len(search_results['all_results']) == 0:
+                        return {
+                            'results': [domain, 'No', 'No search results'],
+                            'llm_usage1': {
+                                'prompt_tokens': 0,
+                                'completion_tokens': 0
+                            },
+                            'llm_usage2': {
+                                'prompt_tokens': 0,
+                                'completion_tokens': 0,
+                                'total_cost_USD': 0
+                            },
+                            'serper_credits': total_serper_credits
+                        }
+                else:
                     return {
-                        'results': [domain, 'No'],
-                        'llm_usage': {
+                        'results': [domain, 'No', 'No search results'],
+                        'llm_usage1': {
                             'prompt_tokens': 0,
                             'completion_tokens': 0
                         },
-                        'serper_credits': search_results['serper_credits']
+                        'llm_usage2': {
+                                'prompt_tokens': 0,
+                                'completion_tokens': 0,
+                                'total_cost_USD': 0
+                            },
+                        'serper_credits': total_serper_credits
                     }
             else:
                 return {
-                    'results': [domain, 'No'],
-                    'llm_usage': {
+                    'results': [domain, 'No', 'No search results'],
+                    'llm_usage1': {
                         'prompt_tokens': 0,
                         'completion_tokens': 0
+                    },
+                    'llm_usage2': {
+                        'prompt_tokens': 0,
+                        'completion_tokens': 0,
+                        'total_cost_USD': 0
                     },
                     'serper_credits': search_results['serper_credits']
                 }
@@ -147,12 +177,12 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
 
                 **Note:** If the domain is **for sale**, return 'No'
 
-                If the relationship is valid, return 'Yes'. If not, return 'No'
+                If the relationship is valid, return 'Yes'. If not, return 'No' and provide appropriate reason for your decision.
 
                 Only use information from the search results. Avoid assumptions.
 
                 Output format:
-                ['{domain}', 'Yes/No']
+                ['{domain}', 'Yes/No', 'Reason']
 
                 **Scoring:**
                 - +1 for correct output (based on evidence)
@@ -160,7 +190,7 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
                 """
             ),
             agent=domain_company_validation_researcher,
-            expected_output="['{domain}', 'Yes/No']"
+            expected_output="['{domain}', 'Yes/No', 'Reason']"
         )
 
         prompt_tokens = tokenize_text(
@@ -186,12 +216,12 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
 
                 **Note:** If the domain is **for sale**, return 'No'
 
-                If the relationship is valid, return 'Yes'. If not, return 'No'
+                If the relationship is valid, return 'Yes'. If not, return 'No' and provide appropriate reason for your decision.
 
                 Only use information from the search results. Avoid assumptions.
 
                 Output format:
-                ['{domain}', 'Yes/No']
+                ['{domain}', 'Yes/No', 'Reason']
 
                 **Scoring:**
                 - +1 for correct output (based on evidence)
@@ -221,8 +251,8 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
         """)
 
         llm_usage = {
-            'prompt_tokens': total_prompt_tokens + prompt_tokens,
-            'completion_tokens': total_completion_tokens + completion_tokens
+            'prompt_tokens': prompt_tokens,
+            'completion_tokens': completion_tokens
         }
 
         results = json_repair.loads(results.raw)
@@ -231,18 +261,56 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
             f.write("\n")
             f.write(f"{domain} validation" + str(llm_usage))
 
+        search_results_links = [get_netloc(result['link']) for result in search_results['all_results']]
+
+        if results[1] == 'Yes':
+            final_validation = validate_domains_that_are_considered_correct_by_llm_in_google_search(search_results['all_results'][0]['link'], main_company, log_file_paths)
+
+            if final_validation['graph_exec_info'] is not None:
+                for exec_info in final_validation['graph_exec_info']:
+                    if exec_info['node_name'] == 'TOTAL RESULT':
+                        total_prompt_tokens2 = exec_info.get('prompt_tokens', 0)
+                        total_completion_tokens2 = exec_info.get('completion_tokens', 0)
+                        total_cost_USD2 = exec_info.get('total_cost_USD', 0.0)
+
+            if final_validation['is_company_domain'] == 'Yes':
+                print(domain + ' ' + str(search_results_links))
+
+                if domain not in search_results_links:
+                    final_validation['is_company_domain'] = 'No'
+                    final_validation['reason'] = 'Domain not found in search results but only subdomain found.'
+
+            return {
+                'results': [domain, final_validation['is_company_domain'], final_validation['reason']],
+                'llm_usage1': {
+                    'prompt_tokens': llm_usage['prompt_tokens'],
+                    'completion_tokens': llm_usage['completion_tokens']
+                },
+                'llm_usage2': {
+                    'prompt_tokens': total_prompt_tokens2,
+                    'completion_tokens': total_completion_tokens2,
+                    'total_cost_USD': total_cost_USD2
+                },
+                'serper_credits': total_serper_credits
+            }
+
         return {
             'results': results,
-            'llm_usage': {
+            'llm_usage1': {
                 'prompt_tokens': llm_usage['prompt_tokens'],
                 'completion_tokens': llm_usage['completion_tokens']
             },
-            'serper_credits': search_results['serper_credits']
+            'llm_usage2': {
+                'prompt_tokens': total_prompt_tokens2,
+                'completion_tokens': total_completion_tokens2,
+                'total_cost_USD': total_cost_USD2
+            },
+            'serper_credits': total_serper_credits
         }
     except Exception as e:
         with open(log_file_paths['log'], 'a') as f:
             f.write(f"Exception when validating domain using crew AI: {e}")
-        return {'results': [domain, 'No'], 'llm_usage': {'prompt_tokens': 0, 'completion_tokens': 0}, 'serper_credits': 0}
+        return {'results': [domain, 'No', f'Exception when validating domain using crew AI: {e}'], 'llm_usage1': {'prompt_tokens': 0, 'completion_tokens': 0}, 'llm_usage2': {'prompt_tokens': 0, 'completion_tokens': 0, 'total_cost_USD': 0}, 'serper_credits': 0}
 
 def validate_working_domains(domains, log_file_path):
     total_prompt_tokens = 0
@@ -291,6 +359,60 @@ def validate_working_domains(domains, log_file_path):
         'total_completion_tokens': total_completion_tokens,
         'total_cost_USD': total_cost_USD
     }
+
+def validate_domains_that_are_considered_correct_by_llm_in_google_search(url, main_company, log_file_paths):
+    try :
+        sample_json_output = json.dumps({'is_company_domain': 'Yes/No', 'reason': 'Reason for Yes or No value'})
+        prompt = (
+            f"""
+                Verify whether the provided website is a part of {main_company} or belongs to a third-party category.
+
+                **Input Details:**
+                - **URL:** {url}
+                - **Company Name:** {main_company}
+
+                **Classification Criteria:**
+
+                1 **Ownership and Affiliation:**
+                - **Primary Criterion:** Determine if the website is **owned, operated, or directly affiliated** with the company. Affiliation can be through subsidiaries, brands, or partnerships.
+                - **Indicators of Ownership/Affiliation:**
+                    - **Copyright Information:** Presence of copyright notices indicating ownership by the company. Note that copyright information may be partially matched.
+                    - **About Us/Corporate Information:** Sections detailing the company's ownership or partnership status.
+
+                2. **Third-Party Categories:**
+                - **Company Reporting Platform:** Provides reports or information about the company without being a part of the company.
+                - **Job Portal:** Lists job openings for the company but is not a part of the company.
+                - **Marketplace:** A platform that offers the company's products alongside a wide range of products from various other companies.
+
+                **Output Format:**
+                Return a JSON object with the following structure:
+                {sample_json_output}
+            """
+        )
+        
+        smart_scraper_graph = SmartScraperGraph(
+            prompt=prompt,
+            source=url,
+            config=graph_config,
+        )
+
+        result = smart_scraper_graph.run()
+        graph_exec_info = smart_scraper_graph.get_execution_info()
+
+        return {
+            'is_company_domain': result['is_company_domain'],
+            'reason': result['reason'],
+            'graph_exec_info': graph_exec_info
+        }
+    except Exception as e:
+        with open(log_file_paths['log'], 'a') as f:
+            f.write(f"Exception when validating domain using scrapegraph AI: {e}")
+        print(f"Exception when validating domain using scrapegraph AI: {e}")
+        return {
+            'is_company_domain': result['is_company_domain'],
+            'reason': 'Exception when validating domain using scrapegraph AI',
+            'graph_exec_info': None
+        }
 
 def validate_single_correct_linkgrabber_domains(log_file_paths, domain_key_value):
     main_domain, domain = domain_key_value
@@ -449,6 +571,7 @@ def validate_agentsOutput_domains(domains, main_company, log_file_path):
     total_prompt_tokens2 = 0
     total_completion_tokens2 = 0
     total_serper_credits = 0
+    total_cost_USD2 = 0
 
     st.write('###### Remove incorrect domains')
 
@@ -472,27 +595,41 @@ def validate_agentsOutput_domains(domains, main_company, log_file_path):
             results.extend(chunk_results)
             progress_bar.progress(min((len(results) + 1) * progress_step, 1.0))
 
+    validation_domain_with_reason = []
+
     for res in results:
         if isinstance(res['results'], list) and len(res['results']) >= 2:
             if res['results'][1] != 'Yes':
                 invalid_non_working_domains.add(res['results'][0])
             else:
                 valid_working_domains.add(res['results'][0])
+
+            validation_domain_with_reason.append([res['results'][0], res['results'][1], res['results'][2]])
         else:
             with open(log_file_path['log'], 'a') as f:
                 f.write(f"Unexpected format in results: {res['results']}")
 
-        total_prompt_tokens2 += res['llm_usage']['prompt_tokens']
-        total_completion_tokens2 += res['llm_usage']['completion_tokens']
+        total_prompt_tokens += res['llm_usage1']['prompt_tokens']
+        total_completion_tokens += res['llm_usage1']['completion_tokens']
         total_serper_credits += res['serper_credits']
 
-    total_cost_USD += calculate_openai_costs(total_prompt_tokens2, total_completion_tokens2)
+        total_prompt_tokens2 += res['llm_usage2']['prompt_tokens']
+        total_completion_tokens2 += res['llm_usage2']['completion_tokens']
+        total_cost_USD2 += res['llm_usage2']['total_cost_USD']
+
+    total_cost_USD += calculate_openai_costs(total_prompt_tokens, total_completion_tokens)
 
     with open(log_file_path['llm'], 'a') as f:
         f.write('Remove incorrect domains')
+        f.write(f"Total prompt tokens: {total_prompt_tokens}\n")
+        f.write(f"Total completion tokens: {total_completion_tokens}\n")
+        f.write(f"Total cost: {total_cost_USD}\n")
+
+    with open(log_file_path['llm'], 'a') as f:
+        f.write('Remove incorrect domains (2nd validation)')
         f.write(f"Total prompt tokens: {total_prompt_tokens2}\n")
         f.write(f"Total completion tokens: {total_completion_tokens2}\n")
-        f.write(f"Total cost: {total_cost_USD}\n")
+        f.write(f"Total cost: {total_cost_USD2}\n")
 
     with open(log_file_path['serper'], 'a') as f:
         f.write('Remove incorrect domains')
@@ -516,18 +653,13 @@ def validate_agentsOutput_domains(domains, main_company, log_file_path):
 
     return {
         # 'invalid_non_working_domains': invalid_non_working_domains,
+        'agentsOutput_validation_AI_responses': validation_domain_with_reason,
         'valid_working_domains': list(valid_working_domains),
         'invalid_non_working_domains': list(invalid_non_working_domains),
         'total_prompt_tokens': total_prompt_tokens + total_prompt_tokens2,
         'total_completion_tokens': total_completion_tokens + total_completion_tokens2,
-        'total_cost_USD': total_cost_USD,
+        'total_cost_USD': total_cost_USD + total_cost_USD2,
         'total_serper_credits': total_serper_credits
     }
-
-
-
-
-    
-
         
     

@@ -63,6 +63,10 @@ if uploaded_file is not None and link_grabber_file is not None and company_name 
 
         response = validate_agentsOutput_domains(agentsOutput, company_name, log_file_paths)
 
+        export_df = pd.DataFrame(response['agentsOutput_validation_AI_responses'], columns=['Domain', 'AI Response', 'Reason'])
+
+        export_df.to_excel(os.path.join(final_results_directory, 'agentsOutput_validation_AI_responses.xlsx'), index=False, header=True)
+
         export_df = pd.DataFrame({
             'Domains': response['invalid_non_working_domains'],
         })
@@ -81,32 +85,33 @@ if uploaded_file is not None and link_grabber_file is not None and company_name 
                             else:
                                 filtered_link_grabber_data[main_domain] = [domain]
 
-        response2 = validate_linkgrabber_domains(filtered_link_grabber_data, log_file_paths)
+        if len(filtered_link_grabber_data) != 0:
+            response2 = validate_linkgrabber_domains(filtered_link_grabber_data, log_file_paths)
 
-        export_df = pd.DataFrame(response2['link_grabber_validation_AI_responses'], columns=['Main Domain', 'Domain', 'AI Response', 'Reason'])
+            export_df = pd.DataFrame(response2['link_grabber_validation_AI_responses'], columns=['Main Domain', 'Domain', 'AI Response', 'Reason'])
 
-        export_df.to_excel(os.path.join(final_results_directory, 'link_grabber_validation_AI_responses.xlsx'), index=False, header=True)
+            export_df.to_excel(os.path.join(final_results_directory, 'link_grabber_validation_AI_responses.xlsx'), index=False, header=True)
 
-        export_df.to_excel(os.path.join(final_results_directory, 'invalid_non_working_domains_of_linkgrabber.xlsx'), index=False, header=True)
+            export_df = pd.DataFrame({
+                'Domains': response2['invalid_non_working_domains'],
+            })
 
-        export_df = pd.DataFrame({
-            'Domains': response2['invalid_non_working_domains'],
-        })
+            export_df.to_excel(os.path.join(final_results_directory, 'invalid_non_working_domains_of_linkgrabber.xlsx'), index=False, header=True)
 
-        export_df.to_excel(os.path.join(final_results_directory, 'invalid_non_working_domains_of_linkgrabber.xlsx'), index=False, header=True)
+            valid_domains = set(response['valid_working_domains'] + response2['valid_working_domains'])
 
-        valid_domains = set(response['valid_working_domains'] + response2['valid_working_domains'])
+            whole_process_prompt_tokens += response2['total_prompt_tokens']
+            whole_process_completion_tokens += response2['total_completion_tokens']
+            whole_process_llm_costs += response2['total_cost_USD']
+            whole_process_serper_credits += response2['total_serper_credits']
+        else:
+            valid_domains = set(response['valid_working_domains'])
 
         # st.write('###### Validate Ground Truth')
 
         # response2 = validate_working_domains(gtd, log_file_paths)
 
         # valid_gtd = response2['valid_working_domains']
-
-        whole_process_prompt_tokens += response2['total_prompt_tokens']
-        whole_process_completion_tokens += response2['total_completion_tokens']
-        whole_process_llm_costs += response2['total_cost_USD']
-        whole_process_serper_credits += response2['total_serper_credits']
 
         whole_process_prompt_tokens += response['total_prompt_tokens']
         whole_process_completion_tokens += response['total_completion_tokens']

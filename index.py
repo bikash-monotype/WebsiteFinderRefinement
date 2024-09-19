@@ -410,10 +410,10 @@ if submit_button:
         df = pd.read_excel(os.path.join(final_results_directory, 'domain_search_agent' + '.xlsx'))
         domain_research_results = set(df['Website URL'].tolist())
 
-        combined_final_results_excluding_link_grabber = websites_results.union(copyright_results).union(domain_research_results).union(grabbed_link_domain_lists)
+        combined_final_results = websites_results.union(copyright_results).union(domain_research_results).union(grabbed_link_domain_lists)
 
-        df = pd.DataFrame(combined_final_results_excluding_link_grabber, columns=['Website URL'])
-        df.to_excel(os.path.join(final_results_directory, 'combined_final_results_excluding_link_grabber' + '.xlsx'), index=False, header=True)
+        df = pd.DataFrame(combined_final_results, columns=['Website URL'])
+        df.to_excel(os.path.join(final_results_directory, 'combined_final_results' + '.xlsx'), index=False, header=True)
 
         st.write('###### Start validation of the domains')
         st.write('###### Remove unreachable, on sale and redirected domains')
@@ -422,11 +422,15 @@ if submit_button:
 
         filtered_agents_output_list = export_df['Company Name'].tolist()
 
-        df = pd.read_excel(os.path.join(final_results_directory, 'combined_final_results_excluding_link_grabber' + '.xlsx'))
+        df = pd.read_excel(os.path.join(final_results_directory, 'combined_final_results' + '.xlsx'))
 
-        combined_final_results_excluding_link_grabber = df['Website URL'].tolist()
+        combined_final_results = df['Website URL'].tolist()
 
-        response = validate_agentsOutput_domains(combined_final_results_excluding_link_grabber, company_name, log_file_paths)
+        response = validate_agentsOutput_domains(combined_final_results, company_name, log_file_paths)
+
+        export_df = pd.DataFrame(response['agentsOutput_validation_AI_responses'], columns=['Domain', 'AI Response', 'Reason'])
+
+        export_df.to_excel(os.path.join(final_results_directory, 'agentsOutput_validation_AI_responses.xlsx'), index=False, header=True)
 
         export_df = pd.DataFrame({
             'Domains': response['invalid_non_working_domains'],
@@ -495,18 +499,12 @@ if submit_button:
             f.write(f"Total Completion Tokens: {response2['total_completion_tokens']}\n")
             f.write(f"Total Cost in USD: {response2['total_cost_USD']}\n")
 
-        print('Iam here 1')
-
         whole_process_prompt_tokens += response2['total_prompt_tokens']
         whole_process_completion_tokens += response2['total_completion_tokens']
         whole_process_llm_costs += response2['total_cost_USD']
         whole_process_serper_credits += response2['total_serper_credits']
 
-        print('Iam here 2')
-
         valid_domains = set(response['valid_working_domains']).union(response2['valid_working_domains'])
-
-        print('Iam here 3')
 
         max_length = max(len(filtered_agents_output_list), len(list(valid_domains)))
 
