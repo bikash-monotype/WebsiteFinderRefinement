@@ -264,14 +264,20 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
         search_results_links = [get_netloc(result['link']) for result in search_results['all_results']]
 
         if results[1] == 'Yes':
-            final_validation = validate_domains_that_are_considered_correct_by_llm_in_google_search(search_results['all_results'][0]['link'], main_company, log_file_paths)
+            final_validation = {}
 
-            if final_validation['graph_exec_info'] is not None:
-                for exec_info in final_validation['graph_exec_info']:
-                    if exec_info['node_name'] == 'TOTAL RESULT':
-                        total_prompt_tokens2 = exec_info.get('prompt_tokens', 0)
-                        total_completion_tokens2 = exec_info.get('completion_tokens', 0)
-                        total_cost_USD2 = exec_info.get('total_cost_USD', 0.0)
+            if domain not in search_results_links:
+                final_validation['is_company_domain'] = 'No'
+                final_validation['reason'] = 'Domain not found in search results but only subdomain found.'
+            else:
+                final_validation = validate_domains_that_are_considered_correct_by_llm_in_google_search(search_results['all_results'][0]['link'], main_company, log_file_paths)
+
+                if final_validation['graph_exec_info'] is not None:
+                    for exec_info in final_validation['graph_exec_info']:
+                        if exec_info['node_name'] == 'TOTAL RESULT':
+                            total_prompt_tokens2 = exec_info.get('prompt_tokens', 0)
+                            total_completion_tokens2 = exec_info.get('completion_tokens', 0)
+                            total_cost_USD2 = exec_info.get('total_cost_USD', 0.0)
 
             if final_validation['is_company_domain'] == 'Yes':
                 print(domain + ' ' + str(search_results_links))
