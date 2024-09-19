@@ -279,13 +279,6 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
                             total_completion_tokens2 = exec_info.get('completion_tokens', 0)
                             total_cost_USD2 = exec_info.get('total_cost_USD', 0.0)
 
-            if final_validation['is_company_domain'] == 'Yes':
-                print(domain + ' ' + str(search_results_links))
-
-                if domain not in search_results_links:
-                    final_validation['is_company_domain'] = 'No'
-                    final_validation['reason'] = 'Domain not found in search results but only subdomain found.'
-
             return {
                 'results': [domain, final_validation['is_company_domain'], final_validation['reason']],
                 'llm_usage1': {
