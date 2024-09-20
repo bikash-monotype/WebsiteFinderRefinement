@@ -173,7 +173,7 @@ if uploaded_file is not None and link_grabber_file is not None and company_name 
         # accuracy = ((len(common_values) + len(new_values_in_valid_output)) / (len(gtd) + len(new_values_in_valid_output))) * 100
 
         # max_length = max(len(gtd), len(agentsOutput), len(new_values_in_valid_output), len(gtd), len(common_values))
-        max_length = max(len(agentsOutput))
+        max_length = len(agentsOutput)
 
         res_data = {
             "Company Name": [f"{company_name}"],
@@ -181,7 +181,7 @@ if uploaded_file is not None and link_grabber_file is not None and company_name 
             # 'Valid GTD': [len(valid_gtd)],
             # "Invalid GTD":[len(list(response2['invalid_non_working_domains'].keys()))],
             'AgentsOutput': [len(agentsOutput)],
-            'Valid AgentsOutput': [len(list(response['final_valid_working_domains']))],
+            'Valid AgentsOutput': [len(list(valid_domains))],
             # 'Common Values': [len(common_values)],
             # 'Missing Values from GTD':[len(missing_values_in_gtd)],
             # 'New Values in Valid Output':[len(new_values_in_valid_output)],
@@ -191,15 +191,15 @@ if uploaded_file is not None and link_grabber_file is not None and company_name 
 
         res_df = pd.DataFrame(res_data)
 
-        acc_df = pd.read_excel("validation/Accuracy-without-gtd.xlsx.xlsx",engine = "openpyxl")
+        acc_df = pd.read_excel("validation/Accuracy-without-gtd.xlsx",engine = "openpyxl")
         acc_df = pd.concat([acc_df,res_df])
-        acc_df.to_excel("validation/Accuracy-without-gtd.xlsx.xlsx", index=False, engine="openpyxl")
+        acc_df.to_excel("validation/Accuracy-without-gtd.xlsx", index=False, engine="openpyxl")
 
         # gtd = pad_list(gtd, max_length)
         # valid_gtd = pad_list(valid_gtd, max_length)
         # invalid_gtd = pad_list(list(response2['invalid_non_working_domains'].keys()), max_length)
         agentsOutput = pad_list(agentsOutput, max_length)
-        valid_agentsOutput = pad_list(list(response['valid_working_domains']), max_length)
+        valid_agentsOutput = pad_list(list(valid_domains), max_length)
         # common_values = pad_list(common_values, max_length)
         # missing_values_in_gtd = pad_list(missing_values_in_gtd, max_length)
         # new_values_in_valid_output = pad_list(new_values_in_valid_output, max_length)
