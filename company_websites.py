@@ -156,6 +156,10 @@ def process_subsidiary(subsidiary, main_company, sample_expert_website_researche
         time.sleep(3)
         results = expert_website_researcher_crew_1.kickoff(inputs={"company_name": subsidiary, "main_company": main_company, "search_results": search_results, "sample_expert_website_researcher_output": sample_expert_website_researcher_output})
 
+        with open(log_file_paths['log'], 'a') as f:
+            f.write("\n")
+            f.write(str(expert_website_researcher_crew_1.usage_metrics))
+
         completions_tokens = tokenize_text(
             f"""
                 Thought: I now can give a great answer

@@ -15,6 +15,7 @@ from helpers import calculate_openai_costs, tokenize_text, get_all_links
 import time
 import pandas as pd
 import json
+from langchain_groq import ChatGroq
 
 load_dotenv()
 
@@ -25,12 +26,9 @@ os.environ['AZURE_OPENAI_API_KEY'] = os.getenv('AZURE_OPENAI_API_KEY')
 os.environ['AZURE_OPENAI_API_VERSION'] = '2023-08-01-preview'
 os.environ['AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT_NAME'] = os.getenv('AZURE_OPENAI_EMBEDDINGS')
 
-model = AzureChatOpenAI(
-    azure_endpoint=os.getenv('AZURE_OPENAI_ENDPOINT'),
-    openai_api_version=os.getenv('OPENAI_API_VERSION'),
-    api_key=os.getenv('AZURE_OPENAI_API_KEY'),
-    model=os.getenv('AZURE_OPENAI_DEPLOYMENT_NAME'),
-    temperature=0
+model = ChatGroq(
+    api_key=os.getenv('GROQ_API_KEY'),
+    model=os.getenv('GROQ_MODEL_NAME')
 )
 
 graph_config = get_scrapegraph_config()
@@ -149,7 +147,7 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
             goal='Validate the relationship between {domain} and {main_company}, assessing whether the domain is officially affiliated with the company. This includes investigating domain ownership, brand association, legal or business affiliations, and any partnerships or acquisitions involving the domain and the company.',
             verbose=True,
             llm=model,
-            model_name=os.getenv('AZURE_OPENAI_MODEL_NAME'),
+            model_name=os.getenv('GROQ_MODEL_NAME'),
             backstory=(
                 """
                 As an expert in domain ownership and corporate affiliations, you specialize in identifying the connections between domains and companies. You excel at conducting thorough research using official sources like WHOIS records, company websites, press releases, and legal documents to verify domain ownership and affiliations.
@@ -244,6 +242,10 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
             'main_company': main_company,
             'search_results': search_results['all_results']
         })
+
+        with open(log_file_paths['log'], 'a') as f:
+            f.write("\n\n")
+            f.write(str(validation_crew.usage_metrics))
 
         completion_tokens = tokenize_text(f"""
             Thought: I now can give a great answer

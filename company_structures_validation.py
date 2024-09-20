@@ -104,6 +104,10 @@ def process_single_company_structure_validation(main_company, subsidiary, log_fi
             'search_results': search_results['all_results']
         })
 
+        with open(log_file_paths['log'], 'a') as f:
+            f.write('\n\n')
+            f.write(str(validation_crew.usage_metrics))
+
         completion_tokens = tokenize_text(f"""
             Thought: I now can give a great answer
             Final Answer: {str(results.raw)}

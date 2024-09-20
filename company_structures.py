@@ -419,6 +419,10 @@ def get_links_for_company_structures_for_private_company(main_company, log_file_
         time.sleep(3)
         trip_crew_subsidiary_research.kickoff()
 
+        with open(log_file_path, 'a') as f:
+            f.write('\n\n')
+            f.write(str(trip_crew_subsidiary_research.usage_metrics))
+
         subsidiary_finder_completions_tokens = tokenize_text(
             f"""
                 Thought: I now can give a great answer
