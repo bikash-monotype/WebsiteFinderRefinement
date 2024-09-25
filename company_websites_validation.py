@@ -15,6 +15,7 @@ from helpers import calculate_openai_costs, tokenize_text, get_all_links
 import time
 import pandas as pd
 import json
+from together import Together
 
 load_dotenv()
 
@@ -25,12 +26,8 @@ os.environ['AZURE_OPENAI_API_KEY'] = os.getenv('AZURE_OPENAI_API_KEY')
 os.environ['AZURE_OPENAI_API_VERSION'] = '2023-08-01-preview'
 os.environ['AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT_NAME'] = os.getenv('AZURE_OPENAI_EMBEDDINGS')
 
-model = AzureChatOpenAI(
-    azure_endpoint=os.getenv('AZURE_OPENAI_ENDPOINT'),
-    openai_api_version=os.getenv('OPENAI_API_VERSION'),
-    api_key=os.getenv('AZURE_OPENAI_API_KEY'),
-    model=os.getenv('AZURE_OPENAI_DEPLOYMENT_NAME'),
-    temperature=0
+model = Together(
+    api_key=os.environ.get('TOGETHER_API_KEY')
 )
 
 graph_config = get_scrapegraph_config()

@@ -17,6 +17,7 @@ from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 import json_repair
 import time
+from together import Together
 
 load_dotenv()
 
@@ -94,12 +95,8 @@ def get_serper_costs(serper_credits):
     return (float(serper_credits) / 1000) * float(os.getenv('SERPER_COST'))
 
 def get_scrapegraph_config():
-    azure_model = AzureChatOpenAI(
-        openai_api_version=os.getenv('OPENAI_API_VERSION'),
-        azure_deployment=os.getenv('AZURE_OPENAI_DEPLOYMENT_NAME'),
-        azure_endpoint=os.getenv('AZURE_OPENAI_ENDPOINT'),
-        api_key=os.getenv('AZURE_OPENAI_API_KEY'),
-        temperature=0
+    model = Together(
+        api_key=os.getenv('TOGETHER_API_KEY')
     )
 
     azure_embeddings = AzureOpenAIEmbeddings(
@@ -111,7 +108,7 @@ def get_scrapegraph_config():
 
     return {
         "llm": {
-            "model_instance": azure_model,
+            "model_instance": model,
             "model_tokens": 100000,
         },
         "embeddings": {

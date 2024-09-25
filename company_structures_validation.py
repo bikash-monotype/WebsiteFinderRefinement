@@ -10,17 +10,14 @@ import dill
 from functools import partial
 from tools import search_multiple_page
 import time
+from together import Together
 
 load_dotenv()
 
 os.environ["SERPER_API_KEY"] = os.getenv('SERPER_API_KEY')
 
-model = AzureChatOpenAI(
-    azure_endpoint=os.getenv('AZURE_OPENAI_ENDPOINT'),
-    openai_api_version=os.getenv('OPENAI_API_VERSION'),
-    api_key=os.getenv('AZURE_OPENAI_API_KEY'),
-    model=os.getenv('AZURE_OPENAI_DEPLOYMENT_NAME'),
-    temperature=0
+model = Together(
+    api_key=os.getenv('TOGETHER_API_KEY')
 )
 
 def process_single_company_structure_validation(main_company, subsidiary, log_file_paths):

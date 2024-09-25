@@ -8,14 +8,12 @@ from tools import search_multiple_page
 from helpers import remove_trailing_slash, get_scrapegraph_config, tokenize_text
 import json_repair
 import time
+from together import Together
 
 load_dotenv()
 
-default_llm = AzureChatOpenAI(
-    azure_endpoint='',
-    model=os.getenv('AZURE_OPENAI_DEPLOYMENT_NAME'),
-    openai_api_version=os.getenv('OPENAI_API_VERSION'),
-    temperature=0
+default_llm = Together(
+    api_key=os.getenv('TOGETHER_API_KEY')
 )
 
 os.environ['AZURE_OPENAI_ENDPOINT'] = os.getenv('AZURE_OPENAI_ENDPOINT')
@@ -505,5 +503,6 @@ def get_company_structures(main_company, log_file_path, url):
             f.write(f"Exception when getting company structures using Scrapegraph AI: {e}")
         print(f"Exception when getting company structures using Scrapegraph AI: {e}")
         return {'result': {'company_structure': None}, 'exec_info': None}
-
     
+response = get_company_structures("Apple Inc.", {"log": "log.txt"}, "https://en.wikipedia.org/wiki/List_of_mergers_and_acquisitions_by_Apple")
+print(response)
