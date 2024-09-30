@@ -8,7 +8,7 @@ import multiprocessing
 import streamlit as st
 from functools import partial
 import dill
-from helpers import process_worker_function, extract_domain_name, is_working_domain, is_regional_domain_enhanced, translate_text, chunk_list, extract_main_part, social_media_domain_main_part, get_netloc
+from helpers import process_worker_function, extract_domain_name, is_working_domain, is_regional_domain_enhanced, translate_text, chunk_list, extract_main_part, social_media_domain_main_part, get_netloc, get_main_domain
 from tools import search_multiple_page
 import json_repair
 from helpers import calculate_openai_costs, tokenize_text, get_all_links
@@ -270,7 +270,9 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
                 final_validation['is_company_domain'] = 'No'
                 final_validation['reason'] = 'Domain not found in search results but only subdomain found.'
             else:
-                final_validation = validate_domains_that_are_considered_correct_by_llm_in_google_search(search_results['all_results'][0]['link'], main_company, log_file_paths)
+                main_url = get_main_domain(search_results['all_results'][0]['link'])
+
+                final_validation = validate_domains_that_are_considered_correct_by_llm_in_google_search(main_url, main_company, log_file_paths)
 
                 if final_validation['graph_exec_info'] is not None:
                     for exec_info in final_validation['graph_exec_info']:
@@ -278,6 +280,27 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
                             total_prompt_tokens2 = exec_info.get('prompt_tokens', 0)
                             total_completion_tokens2 = exec_info.get('completion_tokens', 0)
                             total_cost_USD2 = exec_info.get('total_cost_USD', 0.0)
+
+                    if main_url != search_results['all_results'][0]['link'].rstrip('/'):
+                        if final_validation['ownership_not_clear'] == 'Yes':
+                            final_validation = validate_domains_that_are_considered_correct_by_llm_in_google_search(search_results['all_results'][0]['link'], main_company, log_file_paths)
+
+                            if final_validation['graph_exec_info'] is not None:
+                                for exec_info in final_validation['graph_exec_info']:
+                                    if exec_info['node_name'] == 'TOTAL RESULT':
+                                        total_prompt_tokens2 += exec_info.get('prompt_tokens', 0)
+                                        total_completion_tokens2 += exec_info.get('completion_tokens', 0)
+                                        total_cost_USD2 += exec_info.get('total_cost_USD', 0.0)
+                    else:
+                        if ((len(search_results['all_results']) > 1) and (final_validation['ownership_not_clear'] == 'Yes')):
+                            final_validation = validate_domains_that_are_considered_correct_by_llm_in_google_search(search_results['all_results'][1]['link'], main_company, log_file_paths)
+
+                            if final_validation['graph_exec_info'] is not None:
+                                for exec_info in final_validation['graph_exec_info']:
+                                    if exec_info['node_name'] == 'TOTAL RESULT':
+                                        total_prompt_tokens2 += exec_info.get('prompt_tokens', 0)
+                                        total_completion_tokens2 += exec_info.get('completion_tokens', 0)
+                                        total_cost_USD2 += exec_info.get('total_cost_USD', 0.0)
 
             return {
                 'results': [domain, final_validation['is_company_domain'], final_validation['reason']],
@@ -361,34 +384,82 @@ def validate_working_domains(domains, log_file_path):
 
 def validate_domains_that_are_considered_correct_by_llm_in_google_search(url, main_company, log_file_paths):
     try :
-        sample_json_output = json.dumps({'is_company_domain': 'Yes/No', 'reason': 'Reason for Yes or No value'})
+        sample_json_output = json.dumps({'is_company_domain': 'Yes/No', 'ownership_not_clear': 'Yes/No', 'reason': 'Reason for Yes or No value in is_company_domain'})
+
         prompt = (
             f"""
-                Verify whether the provided website is a part of {main_company} or belongs to a third-party category.
+                **Task Objective:**  
+                Determine whether the specified domain is **formally associated** with the company owning the main website by being part of its subsidiaries, brands, or formal partnerships involving **ownership stakes or equity relationships**. **Exclude any instances where the domain appears as a third-party tool, service, advertisement, or reporting platform, or is associated through license agreements or non-equity partnerships, without formal ownership or stake-based association.**
 
-                **Input Details:**
-                - **URL:** {url}
-                - **Company Name:** {main_company}
+                ### **Task Breakdown:**
 
-                **Classification Criteria:**
+                1. **Presence Verification:**
+                - **Search the provided website ({url})** to determine if it is part of or associated with the specified company ({main_company}).
 
-                1 **Ownership and Affiliation:**
-                - **Primary Criterion:** Determine if the website is **owned, operated, or directly affiliated** with the company. Affiliation can be through subsidiaries, brands, partnerships and acquisitions.
-                - **Indicators of Ownership/Affiliation:**
-                    - **Copyright Information:** Presence of copyright notices indicating ownership by the company. Note that copyright information may be partially matched.
-                    - **About Us/Corporate Information:** Sections detailing the company's ownership or partnership status.
+                2. **Ownership and Association Analysis of {main_company}:**
+                - **Prioritize the Copyright Information:**  
+                    Start by checking the copyright section, usually in the website's footer, for explicit ownership details. Look for indicators such as:
+                    - "© [Year] [Company Name]"
+                    - "Operated by"
+                    - "Owned by"
+                    - "Subsidiary of"
+                    - "Brand of"
+                    - **Focus on Textual Ownership Mentions:** Look for textual confirmation of ownership, especially in legal documents or the "About Us" section.
+                
+                - **Confirm if the domain is associated with the company** in one of the following ways:
+                    - **Subsidiaries:** Verify if the domain belongs to a subsidiary of the company. Look for corporate ownership listings or related documentation.
+                    - **Brands:** Identify if the domain represents a brand of the company. This includes domains for products, services, or divisions under the company’s umbrella.
+                    - **Partnerships with Stakes:** Determine if the domain is part of a formal partnership where the company holds stakes or equity-based investments.
+                    - **Acquisitions:** Check if the domain was acquired or merged into the company.
+                
+                - **Cross-Verification:**
+                    - **Verify Ownership Consistency:** Ensure that all sections of the website (e.g., About Us, Contact, Footer) consistently indicate ownership by {main_company} or its subsidiaries/brands.
+                    - **Check Domain Registration:** Where possible, verify the domain registration details to confirm ownership by the company or its affiliates.
 
-                2. **Third-Party Categories:**
-                - **Company Reporting Platform:** Provides reports or information about the company without being a part of the company.
-                - **Job Portal:** Lists job openings for the company but is not a part of the company.
-                - **Marketplace:** A platform that offers the company's products alongside a wide range of products from various other companies.
+                3. **Handling Third-Party Services and Tools:**
+                - **Exclude third-party tools or services** (e.g., analytics, marketing, IT services) unless they are owned or directly managed by the company or its subsidiaries.
+                - If the domain belongs to a **third-party tool or service** without ownership ties (e.g., external financial platforms, marketplaces, or unrelated service providers), it should be excluded as not formally associated.
 
-                **Output Format:**
-                Return a JSON object with the following structure:
+                4. **Exclusion of Non-Ownership Mentions:**
+                - **Exclude any domain that appears as a**:
+                    - **Service provider**
+                    - **Advertisement platform**
+                    - **Reporting platform**
+                    - **Tool**
+                    - **Without ownership, branding, or equity-based partnerships with the company.**
+
+                5. **Verification of Explicit Ownership Indicators:**
+                - **Primary Focus on Explicit Ownership:** 
+                    - Prioritize sections of the website that explicitly state ownership or affiliation, such as:
+                    - **Footer:** Often contains copyright notices indicating the owning entity (e.g., "© 2024 {main_company}, Inc.").
+                    - **About Us:** Detailed information about the company’s structure and ownership.
+                    - **Legal Notices:** Terms of service, privacy policies, and disclaimers that specify ownership.
+                - **Avoid Relying Solely on Visual Elements:**  
+                    Do not assume ownership based solely on visual branding or logos without textual confirmation.
+
+                ### **Output Format:**
+                Return the following JSON format:
                 {sample_json_output}
+
+                ### **Important Instructions:**
+                - **Prioritize Copyright Information in the Footer:**  
+                First, check the footer for explicit copyright notices or ownership indicators, and use that as the primary source of ownership confirmation.
+                - **Prioritize Ownership and Association Analysis:**  
+                Prioritize identifying explicit ownership, brand affiliation, subsidiaries, or equity-based partnerships. Avoid relying on general mentions, licensing agreements, or indirect references.
+                - **Exclude License-Based Associations:**  
+                **Domains associated through licensing agreements without ownership or equity stakes should be excluded.** This includes situations where the company provides services under license but does not own the domain.
+                - **Exclude Reporting Platforms and Unrelated Tools/Services:**  
+                Websites that report on or discuss the company’s activities or offer unrelated services without formal ownership should be excluded.
+                - **Focus on Ownership and Stakes:**  
+                Only include domains that are tied to the company through ownership stakes or equity-based relationships. Exclude collaborations, licenses, or third-party agreements without ownership.
+                - **Avoid Assumptions:**  
+                Do not infer associations based on partial information or general references. Only classify as "Yes" when there is clear evidence of formal ownership or equity-based association.
+                - ** Ownership Clarity:**
+                Set the value of ownership_not_clear to 'Yes' if the ownership of the domain is not clearly mentioned. Otherwise, set it to 'No'.
+                YOU CANNOT MAKE ANY ASSUMPTIONS. Exclude the domain if ownership is tied to an individual rather than the company entity.
             """
         )
-        
+
         smart_scraper_graph = SmartScraperGraph(
             prompt=prompt,
             source=url,
@@ -400,20 +471,21 @@ def validate_domains_that_are_considered_correct_by_llm_in_google_search(url, ma
 
         return {
             'is_company_domain': result['is_company_domain'],
+            'ownership_not_clear': result['ownership_not_clear'],
             'reason': result['reason'],
             'graph_exec_info': graph_exec_info
         }
     except Exception as e:
         with open(log_file_paths['log'], 'a') as f:
-            f.write(f"Exception when validating domain using scrapegraph AI: {e}")
-        print(f"Exception when validating domain using scrapegraph AI: {e}")
+            f.write(f"Exception when validating domain {url} using scrapegraph AI: {e}")
+        print(f"Exception when validating domain {url} using scrapegraph AI: {e}")
         return {
             'is_company_domain': result['is_company_domain'],
-            'reason': 'Exception when validating domain using scrapegraph AI',
+            'reason': f'Exception when validating domain {url} using scrapegraph AI',
             'graph_exec_info': None
         }
 
-def validate_single_correct_linkgrabber_domains(log_file_paths, domain_key_value):
+def validate_single_correct_linkgrabber_domains(log_file_paths, domain_key_value, main_company):
     main_domain, domain = domain_key_value
     total_serper_credits = 0
 
@@ -431,30 +503,75 @@ def validate_single_correct_linkgrabber_domains(log_file_paths, domain_key_value
         }
     
     try :
-        sample_json_output = json.dumps({'valid': 'True/False', 'reason': 'Reason for True or False value'})
+        sample_json_output = json.dumps({'valid': 'Yes/No', 'reason': 'Reason for True or False value'})
+
         prompt = (
             f"""
-                Determine whether the specific domain is present on the given website and is legitimately associated with the website's company through subsidiaries, brands, partnerships, or other formal relationships. 
-                Exclude any instances where the domain appears solely as a third-party tool, service, payment service, or advertisement without any formal association.
+                **Task Objective:**  
+                Determine whether the specified domain is **formally and currently associated** with the company owning the main website by being part of its subsidiaries, brands, or formal partnerships involving **ownership stakes or equity relationships**. **Exclude any instances where the domain appears as a third-party tool, service, advertisement, or reporting platform, or is associated through license agreements or non-equity partnerships, without formal ownership or stake-based association.**
 
-                ---
-                **Input Details:**
-                **Tasks:**
+                ### **Task Breakdown:**
+
                 1. **Presence Verification:**
-                - Check if the specified domain (`{domain}`) is present anywhere on the website (`{main_domain}`).
+                - Search the provided website (`{main_domain}`) to check if the specified domain (`{domain}`) appears anywhere on the site.
+                - **Email Address Cross-Verification:** If the email address of the domain (`{domain}`) appears in contact information (e.g., contact@{domain}), prioritize this as a potential indicator of ownership or formal association with the company.
 
-                2. **Association Assessment:**
-                - Determine if the domain is associated with the company owning the website in any of the following capacities:
-                    - **Subsidiaries:** Is the domain part of a subsidiary company?
-                    - **Brands:** Does the domain represent a brand under the company's umbrella?
-                    - **Partners:** Is the domain linked through a partnership or collaboration?
-                    - **Other Formal Relationships:** Any other official associations (e.g., joint ventures, franchises).
+                2. **Ownership and Association Analysis of {main_company}:**
+                - **Confirm if the domain is associated with the company** in one of the following ways:
+                    - **Subsidiaries:** Verify if the domain belongs to a subsidiary of the company. Look for corporate ownership listings or related documentation.
+                    - **Brands:** Identify if the domain represents a brand of the company. This includes domains for products, services, or divisions under the company’s umbrella.
+                    - **Partnerships with Stakes:** Determine if the domain is part of a formal partnership where the company holds stakes or equity-based investments.
+                    - **Acquisitions:** Check if the domain was acquired or merged into the company.
+                - **Ownership Indicators:** Look for explicit mentions of ownership, such as:
+                    - "operated by"
+                    - "owned by"
+                    - "subsidiary of"
+                    - "brand of"
+                    - "division of"
+                    - "partnership with equity stake"
+                - **Cross-Verification:**
+                    - Contact 
 
-                3. **Exclusion Criteria:**
-                - Identify if the domain is present **only** as a third-party tool, service, payment service or advertisement without any formal association with the company.
+                - **Important Exclusion - Financial Services Offered Under License Agreements:**
+                    - **Exclude domains associated through license agreements** or where the company provides financial services (e.g., deposit accounts, debit card issuance) under a license to another entity. These do not constitute formal ownership or equity relationships.
+                    - **Examples to Exclude:**
+                    - If the company is merely providing banking services for accounts or cards issued by another entity under a licensing agreement.
+                    - If the domain's services are established or issued by the company under a license but are not owned or controlled by the company.
+                    
+                4. **Handling Third-Party Services and Tools:**
+                - **Exclude third-party tools or services** (e.g., analytics, marketing, IT services) unless they are owned or directly managed by the company or its subsidiaries.
+                - If the domain belongs to a **third-party tool or service** without ownership ties (e.g., external financial platforms, marketplaces, or unrelated service providers), it should be excluded as not formally associated.
 
-                **Output Format:**
+                5. **Exclusion of Non-Ownership Mentions:**
+                - **Exclude any domain that appears as a**:
+                    - **Service provider**
+                    - **Advertisement platform**
+                    - **Reporting platform**
+                    - **Tool**
+                    - **Without ownership, branding, or equity-based partnerships with the company.**
+                - **Exclude Mentions Under License Agreements:**
+                    - **Mentions such as "established by", "issued by", or "in partnership with" under a license agreement do not indicate formal ownership.** Unless the company has a direct ownership stake or the domain is a subsidiary or brand, it should be excluded.
+                    - **Exclude domains where the company acts under a license agreement without ownership or equity stakes.**
+
+                ### **Output Format:**
+                Return the following JSON format:
                 {sample_json_output}
+
+                ### **Important Instructions:**
+                - **Prioritize Ownership and Association Analysis:**  
+                Focus primarily on identifying explicit ownership, brand affiliation, subsidiaries, or equity-based partnerships. Do not rely on general mentions, licensing agreements, or references.
+                - **Exclude License-Based Associations:**  
+                **Domains associated through licensing agreements without ownership or equity stakes should be excluded.** This includes situations where the company provides services under license but does not own the domain.
+                - **Exclude Reporting Platforms:**  
+                Websites that report on or discuss the company’s activities but are not owned or operated by the company should be excluded.
+                - **Exclude Unrelated Tools/Services:**  
+                If the website is operated by a third party without ownership or stakes (e.g., unrelated financial platforms or services), exclude it from being formally associated with the company.
+                - **Focus on Ownership and Stakes:**  
+                Only include domains that are tied to the company through ownership stakes or equity-based relationships. Exclude collaborations, licenses, or third-party agreements without ownership.
+                - **Avoid Assumptions:**  
+                Do not infer associations based on partial information or general references. Only classify as "Yes" when there is clear evidence of formal ownership or equity-based association.
+
+                YOU CANNOT MAKE ANY ASSUMPTIONS.
             """
         )
         
