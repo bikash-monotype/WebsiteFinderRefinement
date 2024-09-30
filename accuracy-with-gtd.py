@@ -63,7 +63,7 @@ if uploaded_file is not None and link_grabber_file is not None and company_name 
 
         response = validate_agentsOutput_domains(agentsOutput, company_name, log_file_paths)
 
-        export_df = pd.DataFrame(response['agentsOutput_validation_AI_responses'], columns=['Domain', 'AI Response', 'Reason'])
+        export_df = pd.DataFrame(response['agentsOutput_validation_AI_responses'], columns=['Domain', 'Ownership Not Clear', 'AI Response', 'Url', 'Reason'])
 
         export_df.to_excel(os.path.join(final_results_directory, 'agentsOutput_validation_AI_responses.xlsx'), index=False, header=True)
 
@@ -86,9 +86,9 @@ if uploaded_file is not None and link_grabber_file is not None and company_name 
                                 filtered_link_grabber_data[main_domain] = [domain]
 
         if len(filtered_link_grabber_data) != 0:
-            response2 = validate_linkgrabber_domains(filtered_link_grabber_data, log_file_paths)
+            response2 = validate_linkgrabber_domains(company_name, filtered_link_grabber_data, log_file_paths)
 
-            export_df = pd.DataFrame(response2['link_grabber_validation_AI_responses'], columns=['Main Domain', 'Domain', 'AI Response', 'Reason'])
+            export_df = pd.DataFrame(response2['link_grabber_validation_AI_responses'], columns=['Main Domain', 'Domain', 'AI Response', 'Reason', 'Url'])
 
             export_df.to_excel(os.path.join(final_results_directory, 'link_grabber_validation_AI_responses.xlsx'), index=False, header=True)
 

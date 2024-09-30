@@ -39,8 +39,8 @@ def get_copyright(url, log_file_path):
         }
     except Exception as e:
         with open(log_file_path['log'], 'a') as f:
-            f.write(f"Exception when getting copyright using scrapegraph AI: {e}")
-        print(f"Exception when getting copyright using scrapegraph AI: {e}")
+            f.write(f"Exception when getting copyright from {url} using scrapegraph AI: {e}")
+        print(f"Exception when getting copyright from {url} using scrapegraph AI: {e}")
         return {
             'result': { 'copyright': None },
             'exec_info': None

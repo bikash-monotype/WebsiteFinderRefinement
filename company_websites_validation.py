@@ -76,8 +76,8 @@ def validate_working_single_domain(log_file_path, domain):
         }
     except Exception as e:
         with open(log_file_path['log'], 'a') as f:
-            f.write(f"Exception when validating domain using scrapegraph AI: {e}")
-        print(f"Exception when validating domain using scrapegraph AI: {e}")
+            f.write(f"Exception when validating domain using scrapegraph AI for {domain}: {e}")
+        print(f"Exception when validating domain using scrapegraph AI for {domain}: {e}")
         return {'domain': domain, 'isVisitable': 'No', 'reason': 'Exception when validating domain using scrapegraph AI', 'exec_info': None}
     
 def validate_single_correct_domains(log_file_paths, main_company, domain):
@@ -103,7 +103,7 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
 
                     if len(search_results['all_results']) == 0:
                         return {
-                            'results': [domain, 'No', 'No search results'],
+                            'results': [domain, 'No', 'No search results', '', ''],
                             'llm_usage1': {
                                 'prompt_tokens': 0,
                                 'completion_tokens': 0
@@ -117,7 +117,7 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
                         }
                 else:
                     return {
-                        'results': [domain, 'No', 'No search results'],
+                        'results': [domain, 'No', 'No search results', '', ''],
                         'llm_usage1': {
                             'prompt_tokens': 0,
                             'completion_tokens': 0
@@ -131,7 +131,7 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
                     }
             else:
                 return {
-                    'results': [domain, 'No', 'No search results'],
+                    'results': [domain, 'No', 'No search results', '', ''],
                     'llm_usage1': {
                         'prompt_tokens': 0,
                         'completion_tokens': 0
@@ -269,6 +269,8 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
             if domain not in search_results_links:
                 final_validation['is_company_domain'] = 'No'
                 final_validation['reason'] = 'Domain not found in search results but only subdomain found.'
+                final_validation['ownership_not_clear'] = 'Yes'
+                final_validation['link'] = ''
             else:
                 main_url = get_main_domain(search_results['all_results'][0]['link'])
 
@@ -303,7 +305,7 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
                                         total_cost_USD2 += exec_info.get('total_cost_USD', 0.0)
 
             return {
-                'results': [domain, final_validation['is_company_domain'], final_validation['reason']],
+                'results': [domain, final_validation['is_company_domain'], final_validation['reason'], final_validation['ownership_not_clear'], final_validation['link']],
                 'llm_usage1': {
                     'prompt_tokens': llm_usage['prompt_tokens'],
                     'completion_tokens': llm_usage['completion_tokens']
@@ -317,7 +319,7 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
             }
 
         return {
-            'results': results,
+            'results': [results[0], results[1], results[2], '', ''],
             'llm_usage1': {
                 'prompt_tokens': llm_usage['prompt_tokens'],
                 'completion_tokens': llm_usage['completion_tokens']
@@ -332,7 +334,7 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
     except Exception as e:
         with open(log_file_paths['log'], 'a') as f:
             f.write(f"Exception when validating domain using crew AI: {e}")
-        return {'results': [domain, 'No', f'Exception when validating domain using crew AI: {e}'], 'llm_usage1': {'prompt_tokens': 0, 'completion_tokens': 0}, 'llm_usage2': {'prompt_tokens': 0, 'completion_tokens': 0, 'total_cost_USD': 0}, 'serper_credits': 0}
+        return {'results': [domain, 'No', f'Exception when validating domain using crew AI: {e}', '', ''], 'llm_usage1': {'prompt_tokens': 0, 'completion_tokens': 0}, 'llm_usage2': {'prompt_tokens': 0, 'completion_tokens': 0, 'total_cost_USD': 0}, 'serper_credits': 0}
 
 def validate_working_domains(domains, log_file_path):
     total_prompt_tokens = 0
@@ -437,6 +439,10 @@ def validate_domains_that_are_considered_correct_by_llm_in_google_search(url, ma
                 - **Avoid Relying Solely on Visual Elements:**  
                     Do not assume ownership based solely on visual branding or logos without textual confirmation.
 
+                6. **Verification of Ownership Clarity:**
+                - If **explicit ownership details are not available** or the relationship is unclear, set the `ownership_not_clear` field to "Yes."
+                - If ownership is clearly stated or verified, set `ownership_not_clear` to "No."
+
                 ### **Output Format:**
                 Return the following JSON format:
                 {sample_json_output}
@@ -455,7 +461,7 @@ def validate_domains_that_are_considered_correct_by_llm_in_google_search(url, ma
                 - **Avoid Assumptions:**  
                 Do not infer associations based on partial information or general references. Only classify as "Yes" when there is clear evidence of formal ownership or equity-based association.
                 - ** Ownership Clarity:**
-                Set the value of ownership_not_clear to 'Yes' if the ownership of the domain is not clearly mentioned. Otherwise, set it to 'No'.
+                Set `ownership_not_clear` to "Yes" if the ownership is not clearly mentioned; otherwise, set it to "No."
                 YOU CANNOT MAKE ANY ASSUMPTIONS. Exclude the domain if ownership is tied to an individual rather than the company entity.
             """
         )
@@ -473,6 +479,7 @@ def validate_domains_that_are_considered_correct_by_llm_in_google_search(url, ma
             'is_company_domain': result['is_company_domain'],
             'ownership_not_clear': result['ownership_not_clear'],
             'reason': result['reason'],
+            'link': url,
             'graph_exec_info': graph_exec_info
         }
     except Exception as e:
@@ -481,11 +488,13 @@ def validate_domains_that_are_considered_correct_by_llm_in_google_search(url, ma
         print(f"Exception when validating domain {url} using scrapegraph AI: {e}")
         return {
             'is_company_domain': result['is_company_domain'],
+            'ownership_not_clear': 'Yes',
             'reason': f'Exception when validating domain {url} using scrapegraph AI',
+            'link': url,
             'graph_exec_info': None
         }
 
-def validate_single_correct_linkgrabber_domains(log_file_paths, domain_key_value, main_company):
+def validate_single_correct_linkgrabber_domains(log_file_paths, main_company, domain_key_value):
     main_domain, domain = domain_key_value
     total_serper_credits = 0
 
@@ -496,6 +505,7 @@ def validate_single_correct_linkgrabber_domains(log_file_paths, domain_key_value
         return {
             'main_domain': main_domain,
             'domain': domain,
+            'link': '',
             'valid': 'False',
             'reason': 'Zero search results',
             'graph_exec_info': None,
@@ -588,25 +598,29 @@ def validate_single_correct_linkgrabber_domains(log_file_paths, domain_key_value
             'main_domain': main_domain,
             'domain': domain,
             'reason': result['reason'],
+            'link': search_results['all_results'][0]['link'],
             'valid': result['valid'],
             'graph_exec_info': graph_exec_info,
             'total_serper_credits': total_serper_credits
         }
     except Exception as e:
         with open(log_file_paths['log'], 'a') as f:
-            f.write(f"Exception when validating domain using scrapegraph AI: {e}")
-        print(f"Exception when validating domain using scrapegraph AI: {e}")
+            f.write(f"Exception when validating {domain} using scrapegraph AI: {e}")
+        print(f"Exception when validating {domain} using scrapegraph AI: {e}")
         return {
             'main_domain': main_domain,
             'domain': domain,
+            'link': search_results['all_results'][0]['link'],
             'valid': 'False',
             'reason': f'Exception when validating domain using scrapegraph AI: {e}',
             'graph_exec_info': None,
             'total_serper_credits': total_serper_credits
         }
 
-def validate_linkgrabber_domains(domains, log_file_path):
+def validate_linkgrabber_domains(main_company, domains, log_file_path):
     domains_key_value = []
+
+    st.write('###### Remove incorrect linkgrabber domains')
 
     for main_domain, value in domains.items():
         for domain in value:
@@ -617,7 +631,7 @@ def validate_linkgrabber_domains(domains, log_file_path):
     total_domains = len(domains_key_value)
     progress_step = 1 / total_domains
 
-    validate_single_correct_domains_with_log = partial(validate_single_correct_linkgrabber_domains, log_file_path)
+    validate_single_correct_domains_with_log = partial(validate_single_correct_linkgrabber_domains, log_file_path, main_company)
 
     serialized_function = dill.dumps(validate_single_correct_domains_with_log)
 
@@ -641,7 +655,7 @@ def validate_linkgrabber_domains(domains, log_file_path):
     validation_domain_with_reason = []
 
     for res in results:
-        validation_domain_with_reason.append([res['main_domain'], res['domain'], res['valid'], res['reason']])
+        validation_domain_with_reason.append([res['main_domain'], res['domain'], res['valid'], res['reason'], res['link']])
 
         if res['valid'] == 'True':
             valid_working_domains.add(res['domain'])
@@ -689,7 +703,7 @@ def validate_agentsOutput_domains(domains, main_company, log_file_path):
     total_serper_credits = 0
     total_cost_USD2 = 0
 
-    st.write('###### Remove incorrect domains')
+    st.write('###### Remove incorrect agentsOutput domains')
 
     progress_bar = st.progress(0)
     total_domains = len(domains)
@@ -714,13 +728,13 @@ def validate_agentsOutput_domains(domains, main_company, log_file_path):
     validation_domain_with_reason = []
 
     for res in results:
-        if isinstance(res['results'], list) and len(res['results']) >= 2:
+        if isinstance(res['results'], list) and len(res['results']) >= 5:
             if res['results'][1] != 'Yes':
                 invalid_non_working_domains.add(res['results'][0])
             else:
                 valid_working_domains.add(res['results'][0])
-
-            validation_domain_with_reason.append([res['results'][0], res['results'][1], res['results'][2]])
+                
+            validation_domain_with_reason.append([res['results'][0], res['results'][3], res['results'][1], res['results'][4], res['results'][2]])
         else:
             with open(log_file_path['log'], 'a') as f:
                 f.write(f"Unexpected format in results: {res['results']}")
