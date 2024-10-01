@@ -506,7 +506,7 @@ def validate_single_correct_linkgrabber_domains(log_file_paths, main_company, do
             'main_domain': main_domain,
             'domain': domain,
             'link': '',
-            'valid': 'False',
+            'valid': 'No',
             'reason': 'Zero search results',
             'graph_exec_info': None,
             'total_serper_credits': total_serper_credits
@@ -733,7 +733,7 @@ def validate_agentsOutput_domains(domains, main_company, log_file_path):
                 invalid_non_working_domains.add(res['results'][0])
             else:
                 valid_working_domains.add(res['results'][0])
-                
+
             validation_domain_with_reason.append([res['results'][0], res['results'][3], res['results'][1], res['results'][4], res['results'][2]])
         else:
             with open(log_file_path['log'], 'a') as f:
