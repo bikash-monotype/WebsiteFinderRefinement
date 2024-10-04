@@ -1,4 +1,3 @@
-from langchain_openai import AzureChatOpenAI
 import os
 from scrapegraphai.graphs import SmartScraperGraph
 from dotenv import load_dotenv
@@ -8,14 +7,14 @@ from tools import search_multiple_page
 from helpers import remove_trailing_slash, get_scrapegraph_config, tokenize_text
 import json_repair
 import time
+from langchain_together import ChatTogether
 
 load_dotenv()
 
-default_llm = AzureChatOpenAI(
-    azure_endpoint='',
-    model=os.getenv('AZURE_OPENAI_DEPLOYMENT_NAME'),
-    openai_api_version=os.getenv('OPENAI_API_VERSION'),
-    temperature=0
+default_llm = ChatTogether(
+    together_api_key=os.getenv('TOGETHER_API_KEY'),
+    model=os.getenv('TOGETHER_MODEL_NAME'),
+    temperature=0,
 )
 
 os.environ['AZURE_OPENAI_ENDPOINT'] = os.getenv('AZURE_OPENAI_ENDPOINT')

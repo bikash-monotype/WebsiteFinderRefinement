@@ -1,4 +1,3 @@
-from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
 import os
 from scrapegraphai.graphs import SmartScraperGraph
 from dotenv import load_dotenv

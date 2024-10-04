@@ -1,6 +1,5 @@
 import multiprocessing
 from crewai import Agent, Task, Crew, Process
-from langchain_openai import AzureChatOpenAI
 from tools import search_multiple_page
 import os
 import json_repair
@@ -14,14 +13,14 @@ from helpers import extract_year, extract_main_part, get_links, process_worker_f
 import dill
 from dotenv import load_dotenv
 import time
+from langchain_together import ChatTogether
 
 load_dotenv()
 
-default_llm = AzureChatOpenAI(
-    azure_endpoint=os.getenv('AZURE_OPENAI_ENDPOINT'),
-    model=os.getenv('AZURE_OPENAI_DEPLOYMENT_NAME'),
-    openai_api_version=os.getenv('OPENAI_API_VERSION'),
-    temperature=0
+default_llm = ChatTogether(
+    together_api_key=os.getenv('TOGETHER_API_KEY'),
+    model=os.getenv('TOGETHER_MODEL_NAME'),
+    temperature=0,
 )
 
 def process_single_website(website, log_file_path):

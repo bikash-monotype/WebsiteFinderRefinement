@@ -6,7 +6,6 @@ import os
 import urllib.parse
 import tldextract
 import dill
-from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
 from dotenv import load_dotenv
 import requests
 from requests.exceptions import ConnectTimeout
@@ -17,6 +16,7 @@ from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 import json_repair
 import time
+from langchain_together import ChatTogether, TogetherEmbeddings
 
 load_dotenv()
 
@@ -34,12 +34,10 @@ social_media_domain_main_part = [
     'myworkdayjobs', 'applytojob', 'device', 'site', 'q4cdn', 'softonic', 'c212', 'gstatic', 'x', 'unpkg', 'hcaptcha', 'yahoo', 'myshopify', 'amazonaws', 'nasa', 'azurewebsites', 'gcs-web', 'ow', 'cloudfront', 'soundcloud', 'onelink', 'bit'
 ]
 
-llm = AzureChatOpenAI(
-    azure_endpoint=os.getenv('AZURE_OPENAI_ENDPOINT'),
-    openai_api_version=os.getenv('OPENAI_API_VERSION'),
-    api_key=os.getenv('AZURE_OPENAI_API_KEY'),
-    model=os.getenv('AZURE_OPENAI_DEPLOYMENT_NAME'),
-    temperature=0
+llm = ChatTogether(
+    together_api_key=os.getenv('TOGETHER_API_KEY'),
+    model=os.getenv('TOGETHER_MODEL_NAME'),
+    temperature=0,
 )
 
 @retry(stop=stop_after_attempt(3), wait=wait_fixed(2), retry=(lambda e: isinstance(e, ConnectTimeout)))
@@ -94,28 +92,23 @@ def get_serper_costs(serper_credits):
     return (float(serper_credits) / 1000) * float(os.getenv('SERPER_COST'))
 
 def get_scrapegraph_config():
-    azure_model = AzureChatOpenAI(
-        openai_api_version=os.getenv('OPENAI_API_VERSION'),
-        azure_deployment=os.getenv('AZURE_OPENAI_DEPLOYMENT_NAME'),
-        azure_endpoint=os.getenv('AZURE_OPENAI_ENDPOINT'),
-        api_key=os.getenv('AZURE_OPENAI_API_KEY'),
-        temperature=0
+    model = ChatTogether(
+        together_api_key=os.getenv('TOGETHER_API_KEY'),
+        model=os.getenv('TOGETHER_MODEL_NAME'),
+        temperature=0,
     )
 
-    azure_embeddings = AzureOpenAIEmbeddings(
-        azure_deployment=os.getenv('AZURE_OPENAI_EMBEDDINGS'),
-        openai_api_version="2023-05-15",
-        azure_endpoint=os.getenv('AZURE_OPENAI_ENDPOINT'),
-        api_key=os.getenv('AZURE_OPENAI_API_KEY'),
+    embeddings = TogetherEmbeddings(
+        model=os.getenv('TOGETHER_EMBEDDINGS_MODEL_NAME'),
     )
 
     return {
         "llm": {
-            "model_instance": azure_model,
+            "model_instance": model,
             "model_tokens": 100000,
         },
         "embeddings": {
-            "model_instance": azure_embeddings
+            "model_instance": embeddings
         },
         "verbose": True,
         "headless": False,

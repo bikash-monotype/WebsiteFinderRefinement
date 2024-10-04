@@ -1,7 +1,6 @@
 from helpers import get_scrapegraph_config
 from dotenv import load_dotenv
 from scrapegraphai.graphs import SmartScraperGraph
-from langchain_openai import AzureChatOpenAI
 import os
 from crewai import Agent, Task, Crew, Process
 import multiprocessing
@@ -15,6 +14,7 @@ from helpers import calculate_openai_costs, tokenize_text, get_all_links
 import time
 import pandas as pd
 import json
+from langchain_together import ChatTogether
 
 load_dotenv()
 
@@ -25,12 +25,10 @@ os.environ['AZURE_OPENAI_API_KEY'] = os.getenv('AZURE_OPENAI_API_KEY')
 os.environ['AZURE_OPENAI_API_VERSION'] = '2023-08-01-preview'
 os.environ['AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT_NAME'] = os.getenv('AZURE_OPENAI_EMBEDDINGS')
 
-model = AzureChatOpenAI(
-    azure_endpoint=os.getenv('AZURE_OPENAI_ENDPOINT'),
-    openai_api_version=os.getenv('OPENAI_API_VERSION'),
-    api_key=os.getenv('AZURE_OPENAI_API_KEY'),
-    model=os.getenv('AZURE_OPENAI_DEPLOYMENT_NAME'),
-    temperature=0
+model = ChatTogether(
+    together_api_key=os.getenv('TOGETHER_API_KEY'),
+    model=os.getenv('TOGETHER_MODEL_NAME'),
+    temperature=0,
 )
 
 graph_config = get_scrapegraph_config()
@@ -387,7 +385,7 @@ def validate_working_domains(domains, log_file_path):
 def validate_domains_that_are_considered_correct_by_llm_in_google_search(url, main_company, log_file_paths):
     try :
         sample_json_output = json.dumps({'is_company_domain': 'Yes/No', 'ownership_not_clear': 'Yes/No', 'reason': 'Reason for Yes or No value in is_company_domain'})
-
+        
         prompt = (
             f"""
                 **Task Objective:**  
@@ -463,6 +461,9 @@ def validate_domains_that_are_considered_correct_by_llm_in_google_search(url, ma
                 - ** Ownership Clarity:**
                 Set `ownership_not_clear` to "Yes" if the ownership is not clearly mentioned; otherwise, set it to "No."
                 YOU CANNOT MAKE ANY ASSUMPTIONS. Exclude the domain if ownership is tied to an individual rather than the company entity.
+
+                - **Return only the JSON output.** Do not include additional explanations, comments, or output beyond the specified JSON format.
+                - **Strictly follow the JSON format provided above** with the three fields: `is_company_domain`, `ownership_not_clear`, and `reason`.
             """
         )
 
@@ -487,7 +488,7 @@ def validate_domains_that_are_considered_correct_by_llm_in_google_search(url, ma
             f.write(f"Exception when validating domain {url} using scrapegraph AI: {e}")
         print(f"Exception when validating domain {url} using scrapegraph AI: {e}")
         return {
-            'is_company_domain': result['is_company_domain'],
+            'is_company_domain': 'No',
             'ownership_not_clear': 'Yes',
             'reason': f'Exception when validating domain {url} using scrapegraph AI',
             'link': url,
@@ -582,6 +583,9 @@ def validate_single_correct_linkgrabber_domains(log_file_paths, main_company, do
                 Do not infer associations based on partial information or general references. Only classify as "Yes" when there is clear evidence of formal ownership or equity-based association.
 
                 YOU CANNOT MAKE ANY ASSUMPTIONS.
+
+                - **Return only the JSON output.** Do not include additional explanations, comments, or output beyond the specified JSON format.
+                - **Strictly follow the JSON format provided above** with the two fields: `valid`, and `reason`.
             """
         )
         
