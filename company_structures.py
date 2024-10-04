@@ -504,5 +504,3 @@ def get_company_structures(main_company, log_file_path, url):
             f.write(f"Exception when getting company structures using Scrapegraph AI for {url}: {e}")
         print(f"Exception when getting company structures using Scrapegraph AI for {url}: {e}")
         return {'result': {'company_structure': None}, 'exec_info': None}
-
-    
