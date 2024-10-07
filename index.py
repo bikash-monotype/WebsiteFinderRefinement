@@ -47,17 +47,21 @@ st.header("Company Details Search")
 with st.form(key="company_details_search"):
     sec_company_id = st.text_input("Company Id")
     company_name = st.text_input("Company Name")
+    uploaded_file = st.file_uploader("Upload GTD", type=["xlsx"])
     
     submit_button = st.form_submit_button(label="Submit")
 
 if submit_button:
     try:
         start_time = datetime.now()
-
         folder_name = datetime.now().strftime("%Y%m%d%H%M%S")
         result_directory = f"{company_name}_{folder_name}"
         final_results_directory = f"final_results/{result_directory}"
         log_file_paths = create_result_directory(result_directory, 'final_results')
+
+        if uploaded_file is not None:
+            st.write(f"File '{uploaded_file.name}' has been uploaded successfully.")
+            gtd = pd.read_excel(uploaded_file)
 
         whole_process_prompt_tokens = 0
         whole_process_completion_tokens = 0
@@ -382,128 +386,17 @@ if submit_button:
         df = pd.DataFrame(combined_final_results, columns=['Website URL'])
         df.to_excel(os.path.join(final_results_directory, 'combined_final_results' + '.xlsx'), index=False, header=True)
 
-        st.write('###### Start validation of the domains')
-        st.write('###### Remove unreachable, on sale and redirected domains')
+        validation_df = pd.concat([gtd, df], axis=1, keys=["GTD", "AgentsOutput"])
+        validation_input_path = f"./validation_input/{company_name}_validation.xlsx"
+        validation_df.to_excel(validation_input_path)
 
-        exit()
 
-        if has_sec_urls is False:
-            export_df = pd.read_excel(os.path.join(final_results_directory, 'filtered_valid_subsidiaries_output_list' + '.xlsx'))
+        st.write("############### Completing the agentic run #########################")
+        st.write("############### Starting the validation #########################")
 
-            filtered_agents_output_list = export_df['Company Name'].tolist()
-        else:
-            export_df = pd.read_excel(os.path.join(final_results_directory, 'company_structures' + '.xlsx'))
+        os.system(f"python accuracy-with-gtd.py --validation_df '{validation_input_path}' --link_grabber '{os.path.join(final_results_directory, 'link_grabber_agent.json')}' --company_name '{company_name}'")
 
-            filtered_agents_output_list = export_df['Company Structure'].tolist()
-
-        df = pd.read_excel(os.path.join(final_results_directory, 'combined_final_results' + '.xlsx'))
-
-        combined_final_results = df['Website URL'].tolist()
-
-        response = validate_agentsOutput_domains(combined_final_results, company_name, log_file_paths)
-
-        export_df = pd.DataFrame(response['agentsOutput_validation_AI_responses'], columns=['Domain', 'Ownership Not Clear', 'AI Response', 'Reason', 'Url'])
-
-        export_df.to_excel(os.path.join(final_results_directory, 'agentsOutput_validation_AI_responses.xlsx'), index=False, header=True)
-
-        export_df = pd.DataFrame({
-            'Domains': response['invalid_non_working_domains'],
-        })
-
-        export_df.to_excel(os.path.join(final_results_directory, 'invalid_non_working_domains_excluding_linkgrabber.xlsx'), index=False, header=True)
-
-        with open(log_file_paths['serper'], 'a') as f:
-            f.write("\n\n")
-            f.write(f"Validation domains excluding link grabber.\n")
-            f.write(f"Total Credits: {response['total_serper_credits']}\n")
-            f.write(f"Total Cost in USD: {get_serper_costs(response['total_serper_credits'])}\n")
-
-        with open(log_file_paths['llm'], 'a') as f:
-            f.write("\n\n")
-            f.write(f"Validating domains excluding link grabber:\n")
-            f.write(f"Total Prompt Tokens: {response['total_prompt_tokens']}\n")
-            f.write(f"Total Completion Tokens: {response['total_completion_tokens']}\n")
-            f.write(f"Total Cost in USD: {response['total_cost_USD']}\n")
-
-        whole_process_prompt_tokens += response['total_prompt_tokens']
-        whole_process_completion_tokens += response['total_completion_tokens']
-        whole_process_llm_costs += response['total_cost_USD']
-        whole_process_serper_credits += response['total_serper_credits']
-
-        link_grabber_file = open(os.path.join(final_results_directory, 'link_grabber_agent.json'), "r")
-
-        link_grabber_data = json.load(link_grabber_file)
-
-        filtered_link_grabber_data = {}
-
-        for data in link_grabber_data:
-            for main_domain, domains in data.items():
-                if main_domain in response['valid_working_domains']:
-                    for domain in domains:
-                        if domain not in response['valid_working_domains']:
-                            if main_domain in filtered_link_grabber_data:
-                                filtered_link_grabber_data[main_domain].append(domain)
-                            else:
-                                filtered_link_grabber_data[main_domain] = [domain]
-
-        response2 = validate_linkgrabber_domains(filtered_link_grabber_data, log_file_paths)
-
-        export_df = pd.DataFrame(response2['link_grabber_validation_AI_responses'], columns=['Main Domain', 'Domain', 'AI Response', 'Reason', 'Url'])
-
-        export_df.to_excel(os.path.join(final_results_directory, 'link_grabber_validation_AI_responses.xlsx'), index=False, header=True)
-
-        export_df.to_excel(os.path.join(final_results_directory, 'invalid_non_working_domains_of_linkgrabber.xlsx'), index=False, header=True)
-
-        export_df = pd.DataFrame({
-            'Domains': response2['invalid_non_working_domains'],
-        })
-
-        export_df.to_excel(os.path.join(final_results_directory, 'invalid_non_working_domains_of_linkgrabber.xlsx'), index=False, header=True)
-
-        with open(log_file_paths['serper'], 'a') as f:
-            f.write("\n\n")
-            f.write(f"Validation link grabber domains.\n")
-            f.write(f"Total Credits: {response2['total_serper_credits']}\n")
-            f.write(f"Total Cost in USD: {get_serper_costs(response2['total_serper_credits'])}\n")
-
-        with open(log_file_paths['llm'], 'a') as f:
-            f.write("\n\n")
-            f.write(f"Validating link grabber domains:\n")
-            f.write(f"Total Prompt Tokens: {response2['total_prompt_tokens']}\n")
-            f.write(f"Total Completion Tokens: {response2['total_completion_tokens']}\n")
-            f.write(f"Total Cost in USD: {response2['total_cost_USD']}\n")
-
-        whole_process_prompt_tokens += response2['total_prompt_tokens']
-        whole_process_completion_tokens += response2['total_completion_tokens']
-        whole_process_llm_costs += response2['total_cost_USD']
-        whole_process_serper_credits += response2['total_serper_credits']
-
-        valid_domains = set(response['valid_working_domains']).union(response2['valid_working_domains'])
-
-        max_length = max(len(filtered_agents_output_list), len(list(valid_domains)))
-
-        export_df = pd.DataFrame({
-            'Company Name': pad_list([company_name], max_length),
-            'Subsidiaries': pad_list(filtered_agents_output_list, max_length),
-            'Domains': pad_list(list(valid_domains), max_length),
-        })
-
-        export_df.to_excel(os.path.join(final_results_directory, 'final_output.xlsx'), index=False, header=True)
-
-        st.write(f"Total Prompt Tokens: {whole_process_prompt_tokens}")
-        st.write(f"Total Completion Tokens: {whole_process_completion_tokens}")
-        st.write(f"Total Cost in USD: {whole_process_llm_costs}")
-        st.write(f"Total Serper Credits: {whole_process_serper_credits}")
-
-        endtime = datetime.now() - start_time
-
-        with open(log_file_paths['log'], 'a') as f:
-            f.write("\n\n")
-            f.write(f"Time Taken To Complete the whole process: {endtime}\n")
-            f.write(f"Total Prompt Tokens: {whole_process_prompt_tokens}\n")
-            f.write(f"Total Completion Tokens: {whole_process_completion_tokens}\n")
-            f.write(f"Total Cost in USD: {whole_process_llm_costs}\n")
-            f.write(f"Total Serper Credits: {whole_process_serper_credits}\n")
-            f.write(f"Total Cost in USD for Serper Credits: {get_serper_costs(whole_process_serper_credits)}\n")
     except Exception as e:
         st.error(f"An error occurred: {e}")
+
+
