@@ -26,45 +26,6 @@ os.environ['AZURE_OPENAI_API_VERSION'] = '2023-08-01-preview'
 os.environ['AZURE_OPENAI_EMBEDDINGS_DEPLOYMENT_NAME'] = os.getenv('AZURE_OPENAI_EMBEDDINGS')
 
 graph_config = get_scrapegraph_config()
-
-subsidiary_finder_link_grabber_agent = Agent(
-    role="Link Researcher",
-    goal="Gather links that can help identify the subsidiaries/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of the given company.",
-    verbose=True,
-    llm=default_llm,
-    allow_delegation=False,
-    backstory="""
-    You are a skilled web researcher with expertise in finding relevant information online.
-    Your task is to gather links that can help identify the web links that can help to find out the subsidiaries/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of the given company.
-    You are proficient in using search engines like Google to find web pages related to the subsidiaries/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of companies.
-    You know how to select multiple relevant URLs from search results that are likely to contain information about the subsidiaries/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of a company.
-""")
-
-brands_finder_link_grabber_agent = Agent(
-    role="Link Researcher",
-    goal="Gather links that can help identify the brands/sub-brands/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of the given company.",
-    verbose=True,
-    llm=default_llm,
-    allow_delegation=False,
-    backstory="""
-    You are a skilled web researcher with expertise in finding relevant information online.
-    Your task is to gather links that can help identify the web links that can help to find out the brands/sub-brands/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of the given company.
-    You are proficient in using search engines like Google to find web pages related to the brands/sub-brands/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of companies.
-    You know how to select multiple relevant URLs from search results that are likely to contain information about the brands/sub-brands/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of a company.
-""")
-
-acquisitions_finder_link_grabber_agent = Agent(
-    role="Link Researcher",
-    goal="Gather links that can help identify the acquisitions/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of the given company.",
-    verbose=True,
-    llm=default_llm,
-    allow_delegation=False,
-    backstory="""
-    You are a skilled web researcher with expertise in finding relevant information online.
-    Your task is to gather links that can help identify the web links that can help to find out the acquisitions/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of the given company.
-    You are proficient in using search engines like Google to find web pages related to the acquisitions/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of companies.
-    You know how to select multiple relevant URLs from search results that are likely to contain information about the acquisitions/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of a company.
-    """)
         
 def get_links_for_company_structures(main_company, log_file_path, url):
     try :
@@ -103,6 +64,45 @@ def get_links_for_company_structures_for_private_company(main_company, log_file_
         subsidiary_finder_search_results = search_multiple_page("all subsidiaries of " + main_company, 100, 3, log_file_path)
         brands_finder_search_results = search_multiple_page("all brands of " + main_company, 100, 3, log_file_path)
         acquisitions_finder_search_results = search_multiple_page("all acquisitions of " + main_company, 100, 3, log_file_path)
+        
+        subsidiary_finder_link_grabber_agent = Agent(
+            role="Link Researcher",
+            goal="Gather links that can help identify the subsidiaries/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of the given company.",
+            verbose=True,
+            llm=default_llm,
+            allow_delegation=False,
+            backstory="""
+            You are a skilled web researcher with expertise in finding relevant information online.
+            Your task is to gather links that can help identify the web links that can help to find out the subsidiaries/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of the given company.
+            You are proficient in using search engines like Google to find web pages related to the subsidiaries/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of companies.
+            You know how to select multiple relevant URLs from search results that are likely to contain information about the subsidiaries/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of a company.
+        """)
+
+        brands_finder_link_grabber_agent = Agent(
+            role="Link Researcher",
+            goal="Gather links that can help identify the brands/sub-brands/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of the given company.",
+            verbose=True,
+            llm=default_llm,
+            allow_delegation=False,
+            backstory="""
+            You are a skilled web researcher with expertise in finding relevant information online.
+            Your task is to gather links that can help identify the web links that can help to find out the brands/sub-brands/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of the given company.
+            You are proficient in using search engines like Google to find web pages related to the brands/sub-brands/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of companies.
+            You know how to select multiple relevant URLs from search results that are likely to contain information about the brands/sub-brands/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of a company.
+        """)
+
+        acquisitions_finder_link_grabber_agent = Agent(
+            role="Link Researcher",
+            goal="Gather links that can help identify the acquisitions/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of the given company.",
+            verbose=True,
+            llm=default_llm,
+            allow_delegation=False,
+            backstory="""
+            You are a skilled web researcher with expertise in finding relevant information online.
+            Your task is to gather links that can help identify the web links that can help to find out the acquisitions/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of the given company.
+            You are proficient in using search engines like Google to find web pages related to the acquisitions/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of companies.
+            You know how to select multiple relevant URLs from search results that are likely to contain information about the acquisitions/trusts/entities/global operations/charitable organizations/companies with more than 50% partnership of a company.
+        """)
 
         subsidiary_finder_link_grabber_task = Task(
             description=(
