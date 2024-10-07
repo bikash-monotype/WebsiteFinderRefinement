@@ -406,7 +406,7 @@ def validate_domains_that_are_considered_correct_by_llm_in_google_search(url, ma
 
             ##### **Strict Exact Copyright Matching Only:**
             - Start by checking the copyright section, usually in the website's footer, for explicit ownership details.
-            - **Only consider the domain as associated if there is an exact match of "© [{main_company}]".** Ignore any variations, additional text, or differences in the company name.
+            - **Only consider the domain as associated if there is an exact match of "© {main_company}".** Ignore any variations, additional text, or differences in the company name.
             - **The main company name must be exact; nothing else is allowed.** For example, "abc inc" and "abc xyz inc" should be treated differently and are not considered exact matches.
 
             ##### **Focus on Textual Ownership Mentions:**
@@ -436,7 +436,7 @@ def validate_domains_that_are_considered_correct_by_llm_in_google_search(url, ma
 
             #### 6. **Verification of Explicit Ownership Indicators:**
             - **Primary Focus on Exact Copyright Match:**
-            - **Footer:** Confirm the presence of an exact match of "© [{main_company}]" in the footer. This is the primary source of ownership confirmation.
+            - **Footer:** Confirm the presence of an exact match of "© {main_company}" in the footer. This is the primary source of ownership confirmation.
             - **About Us & Legal Notices:** Only consider these sections if the exact copyright match is found.
             - **Avoid Relying Solely on Visual Elements:**  
             Do not assume ownership based solely on visual branding or logos without textual confirmation.
