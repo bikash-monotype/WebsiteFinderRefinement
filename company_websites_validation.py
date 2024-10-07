@@ -80,7 +80,7 @@ def validate_working_single_domain(log_file_path, domain):
         print(f"Exception when validating domain using scrapegraph AI for {domain}: {e}")
         return {'domain': domain, 'isVisitable': 'No', 'reason': 'Exception when validating domain using scrapegraph AI', 'exec_info': None}
     
-def validate_single_correct_domains(log_file_paths, main_company, domain):
+def validate_single_correct_domains(log_file_paths, main_company, main_company_domain, domain):
     try:
         total_serper_credits = 0
 
@@ -274,7 +274,7 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
             else:
                 main_url = get_main_domain(search_results['all_results'][0]['link'])
 
-                final_validation = validate_domains_that_are_considered_correct_by_llm_in_google_search(main_url, main_company, log_file_paths)
+                final_validation = validate_domains_that_are_considered_correct_by_llm_in_google_search(main_url, main_company, main_company_domain, log_file_paths)
 
                 if final_validation['graph_exec_info'] is not None:
                     for exec_info in final_validation['graph_exec_info']:
@@ -285,7 +285,7 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
 
                     if main_url != search_results['all_results'][0]['link'].rstrip('/'):
                         if final_validation['ownership_not_clear'] == 'Yes':
-                            final_validation = validate_domains_that_are_considered_correct_by_llm_in_google_search(search_results['all_results'][0]['link'], main_company, log_file_paths)
+                            final_validation = validate_domains_that_are_considered_correct_by_llm_in_google_search(search_results['all_results'][0]['link'], main_company, main_company_domain, log_file_paths)
 
                             if final_validation['graph_exec_info'] is not None:
                                 for exec_info in final_validation['graph_exec_info']:
@@ -295,7 +295,7 @@ def validate_single_correct_domains(log_file_paths, main_company, domain):
                                         total_cost_USD2 += exec_info.get('total_cost_USD', 0.0)
                     else:
                         if ((len(search_results['all_results']) > 1) and (final_validation['ownership_not_clear'] == 'Yes')):
-                            final_validation = validate_domains_that_are_considered_correct_by_llm_in_google_search(search_results['all_results'][1]['link'], main_company, log_file_paths)
+                            final_validation = validate_domains_that_are_considered_correct_by_llm_in_google_search(search_results['all_results'][1]['link'], main_company, main_company_domain, log_file_paths)
 
                             if final_validation['graph_exec_info'] is not None:
                                 for exec_info in final_validation['graph_exec_info']:
@@ -384,98 +384,99 @@ def validate_working_domains(domains, log_file_path):
         'total_cost_USD': total_cost_USD
     }
 
-def validate_domains_that_are_considered_correct_by_llm_in_google_search(url, main_company, log_file_paths):
+def validate_domains_that_are_considered_correct_by_llm_in_google_search(url, main_company, main_company_domain, log_file_paths):
     try :
         sample_json_output = json.dumps({'is_company_domain': 'Yes/No', 'ownership_not_clear': 'Yes/No', 'reason': 'Reason for Yes or No value in is_company_domain'})
 
         prompt = (
-            f"""
-            **Task Objective:**
-            Determine whether the specified domain is **formally associated** with the company owning the main website by being part of its subsidiaries, brands, or formal partnerships involving **ownership stakes or equity relationships**. 
-            Exclude any instances where the domain appears as a third-party tool, service, advertisement, or reporting platform, or is associated through license agreements or non-equity partnerships, without formal ownership or stake-based association.
+        f"""
+        **Task Objective:**
+        Determine whether the specified domain is **formally associated** with the company owning the main website by being part of its subsidiaries, brands, or formal partnerships involving **ownership stakes or equity relationships**.
+        Exclude any instances where the domain appears as a third-party tool, service, advertisement, or reporting platform, or is associated through license agreements or non-equity partnerships, without formal ownership or stake-based association.
 
-            **Domain:** {url}  
-            **Main Website:** {main_company}
+        **Domain:** {url}  
+        **Main Company Name:** {main_company}  
+        **Main Company Domain:** {main_company_domain}
 
-            ### **Task Breakdown:**
+        ### **Task Breakdown:**
 
-            #### 1. **Presence Verification:**
-            - **Search the provided website ({url})** to determine if it is part of or associated with the specified company ({main_company}).
+        #### 1. **Presence Verification:**
+        - **Search the provided website ({url})** to determine if it is part of or associated with the specified company ({main_company}).
 
-            #### 2. **Ownership and Association Analysis of {main_company}:**
+        #### 2. **Ownership and Association Analysis of {main_company}:**
 
-            ##### **Strict Exact Copyright Matching Only:**
-            - Start by checking the copyright section, usually in the website's footer, for explicit ownership details.
-            - **Only consider the domain as associated if there is an exact match of "© {main_company}".** Ignore any variations, additional text, or differences in the company name.
-            - **The main company name must be exact; nothing else is allowed.** For example, "abc inc" and "abc xyz inc" should be treated differently and are not considered exact matches.
+        ##### **Strict Copyright Matching:**
+        - Start by checking the copyright section, usually in the website's footer, for explicit ownership details.
+        - **First, try to find an exact match of "© [{main_company}]". If an exact match is not found, then check if the copyright text includes a hyperlink to the main company's domain ({main_company_domain}) and mentions the company explicitly.** The hyperlink for phrases similar to "Part of [main_company]" (e.g., "A member of [main_company]", "Owned by [main_company]", or any similar phrase indicating formal ownership) must point to the main company's domain ({main_company_domain}) to confirm the association.
+        - **The main company name must be exact; nothing else is allowed.** For example, "abc inc" and "abc xyz inc" should be treated differently and are not considered exact matches.
 
-            ##### **Focus on Textual Ownership Mentions:**
-            - Look for textual confirmation of ownership, especially in legal documents or the "About Us" section, but only after confirming the exact copyright match.
+        ##### **Focus on Textual Ownership Mentions:**
+        - Look for textual confirmation of ownership, especially in legal documents or the "About Us" section, but only after attempting the copyright match.
 
-            ##### **Confirm if the domain is associated with the company in one of the following ways:**
-            - **Subsidiaries:** Verify if the domain belongs to a subsidiary of the company. Look for corporate ownership listings or related documentation.
-            - **Brands:** Identify if the domain represents a brand of the company. This includes domains for products, services, or divisions under the company’s umbrella.
-            - **Partnerships with Stakes:** Determine if the domain is part of a formal partnership where the company holds stakes or equity-based investments.
-            - **Acquisitions:** Check if the domain was acquired or merged into the company.
+        ##### **Confirm if the domain is associated with the company in one of the following ways:**
+        - **Subsidiaries:** Verify if the domain belongs to a subsidiary of the company. Look for corporate ownership listings or related documentation.
+        - **Brands:** Identify if the domain represents a brand of the company. This includes domains for products, services, or divisions under the company’s umbrella.
+        - **Partnerships with Stakes:** Determine if the domain is part of a formal partnership where the company holds stakes or equity-based investments.
+        - **Acquisitions:** Check if the domain was acquired or merged into the company.
 
-            #### 3. **Cross-Verification:**
-            - **Verify Ownership Consistency:** Ensure that all sections of the website (e.g., About Us, Contact, Footer) consistently indicate ownership by {main_company} or its subsidiaries/brands.
-            - **Check Domain Registration:** Where possible, verify the domain registration details to confirm ownership by the company or its affiliates.
+        #### 3. **Cross-Verification:**
+        - **Verify Ownership Consistency:** Ensure that all sections of the website (e.g., About Us, Contact, Footer) consistently indicate ownership by {main_company} or its subsidiaries/brands.
+        - **Check Domain Registration:** Where possible, verify the domain registration details to confirm ownership by the company or its affiliates.
 
-            #### 4. **Handling Third-Party Services and Tools:**
-            - **Exclude third-party tools or services** (e.g., analytics, marketing, IT services) unless they are owned or directly managed by the company or its subsidiaries.
-            - If the domain belongs to a **third-party tool or service** without ownership ties (e.g., external financial platforms, marketplaces, or unrelated service providers), it should be excluded as not formally associated.
+        #### 4. **Handling Third-Party Services and Tools:**
+        - **Exclude third-party tools or services** (e.g., analytics, marketing, IT services) unless they are owned or directly managed by the company or its subsidiaries.
+        - If the domain belongs to a **third-party tool or service** without ownership ties (e.g., external financial platforms, marketplaces, or unrelated service providers), it should be excluded as not formally associated.
 
-            #### 5. **Exclusion of Non-Ownership Mentions:**
-            - **Exclude any domain that appears as a**:
-            - **Service provider**
-            - **Advertisement platform**
-            - **Reporting platform**
-            - **Tool**
-            - **Without ownership, branding, or equity-based partnerships with the company.**
+        #### 5. **Exclusion of Non-Ownership Mentions:**
+        - **Exclude any domain that appears as a**:
+        - **Service provider**
+        - **Advertisement platform**
+        - **Reporting platform**
+        - **Tool**
+        - **Without ownership, branding, or equity-based partnerships with the company.**
 
-            #### 6. **Verification of Explicit Ownership Indicators:**
-            - **Primary Focus on Exact Copyright Match:**
-            - **Footer:** Confirm the presence of an exact match of "© {main_company}" in the footer. This is the primary source of ownership confirmation.
-            - **About Us & Legal Notices:** Only consider these sections if the exact copyright match is found.
-            - **Avoid Relying Solely on Visual Elements:**  
-            Do not assume ownership based solely on visual branding or logos without textual confirmation.
+        #### 6. **Verification of Explicit Ownership Indicators:**
+        - **Primary Focus on Copyright Match:**
+        - **Footer:** First, try to find an exact match of "© [{main_company}]" in the footer. If an exact match is not found, check if the copyright text includes a hyperlink to the main company's domain ({main_company_domain}) and explicitly mentions the company with phrases similar to "Part of [main_company]" (e.g., "A member of [main_company]", "Owned by [main_company]", or any similar phrase indicating formal ownership). The hyperlink for the phrase "Part of [main_company]" must point to the main company's domain ({main_company_domain}) to confirm the association.
+        - **About Us & Legal Notices:** Only consider these sections if the copyright match is found or if the main company's domain is included and the company is explicitly mentioned in the footer.
+        - **Avoid Relying Solely on Visual Elements:**  
+        Do not assume ownership based solely on visual branding or logos without textual confirmation.
 
-            #### 7. **Verification of Ownership Clarity:**
-            - If **explicit ownership details are not available** or the relationship is unclear, set the `ownership_not_clear` field to "Yes."
-            - If ownership is clearly stated or verified through the exact copyright match, set `ownership_not_clear` to "No."
+        #### 7. **Verification of Ownership Clarity:**
+        - If **explicit ownership details are not available** or the relationship is unclear, set the `ownership_not_clear` field to "Yes."
+        - If ownership is clearly stated or verified through the copyright match or mention of the main company's domain, set `ownership_not_clear` to "No."
 
-            ### **Output Format:**
-            Return the following JSON format: {sample_json_output}
+        ### **Output Format:**
+        Return the following JSON format: {sample_json_output}
 
-            ### **Important Instructions:**
+        ### **Important Instructions:**
 
-            #### **Strict Exact Copyright Matching**
-            - Only consider the domain as associated if there is an exact match of "© {main_company}" in the footer.
-            - Do not accept variations like additional text, or company suffixes (e.g., "Inc.", "LLC").
-            - **The main company name must be exact; nothing else is allowed.** For example, "abc inc" and "abc xyz inc" should be treated differently and are not considered exact matches.
+        #### **Strict Copyright Matching**
+        - First, try to find an exact match of "© {main_company}" in the footer. If an exact match is not found, check if the copyright text includes a hyperlink to the main company's domain ({main_company_domain}) and explicitly mentions the company. The hyperlink for the phrase "Part of [main_company]" must point to the main company's domain ({main_company_domain}).
+        - Do not accept variations like additional text or company suffixes (e.g., "Inc.", "LLC").
+        - **The main company name must be exact; nothing else is allowed.** For example, "abc inc" and "abc xyz inc" should be treated differently and are not considered exact matches.
 
-            #### **Prioritize Ownership and Association Analysis:**
-            - After confirming the exact copyright match, proceed to identify explicit ownership, brand affiliation, subsidiaries, or equity-based partnerships.
+        #### **Prioritize Ownership and Association Analysis:**
+        - After attempting the copyright match, proceed to identify explicit ownership, brand affiliation, subsidiaries, or equity-based partnerships.
 
-            #### **Exclude License-Based Associations:**
-            - **Domains associated through licensing agreements without ownership or equity stakes should be excluded.** This includes situations where the company provides services under license but does not own the domain.
+        #### **Exclude License-Based Associations:**
+        - **Domains associated through licensing agreements without ownership or equity stakes should be excluded.** This includes situations where the company provides services under license but does not own the domain.
 
-            #### **Exclude Reporting Platforms and Unrelated Tools/Services:**
-            - Websites that report on or discuss the company’s activities or offer unrelated services without formal ownership should be excluded.
+        #### **Exclude Reporting Platforms and Unrelated Tools/Services:**
+        - Websites that report on or discuss the company’s activities or offer unrelated services without formal ownership should be excluded.
 
-            #### **Focus on Ownership and Stakes:**
-            - Only include domains that are tied to the company through ownership stakes or equity-based relationships. Exclude collaborations, licenses, or third-party agreements without ownership.
+        #### **Focus on Ownership and Stakes:**
+        - Only include domains that are tied to the company through ownership stakes or equity-based relationships. Exclude collaborations, licenses, or third-party agreements without ownership.
 
-            #### **Avoid Assumptions:**
-            - Do not infer associations based on partial information or general references. Only classify as "Yes" when there is clear evidence of formal ownership or equity-based association.
+        #### **Avoid Assumptions:**
+        - Do not infer associations based on partial information or general references. Only classify as "Yes" when there is clear evidence of formal ownership or equity-based association.
 
-            #### **Ownership Clarity:**
-            - Set `ownership_not_clear` to "Yes" if the ownership is not clearly mentioned; otherwise, set it to "No."
+        #### **Ownership Clarity:**
+        - Set `ownership_not_clear` to "Yes" if the ownership is not clearly mentioned; otherwise, set it to "No."
 
-            **YOU CANNOT MAKE ANY ASSUMPTIONS. Exclude the domain if ownership is tied to an individual rather than the company entity.**
-            """
-        )
+        **YOU CANNOT MAKE ANY ASSUMPTIONS. Exclude the domain if ownership is tied to an individual rather than the company entity.**
+        """
+    )
 
         smart_scraper_graph = SmartScraperGraph(
             prompt=prompt,
@@ -702,7 +703,7 @@ def validate_linkgrabber_domains(main_company, domains, log_file_path):
         'total_serper_credits': total_serper_credits
     }
 
-def validate_agentsOutput_domains(domains, main_company, log_file_path):
+def validate_agentsOutput_domains(domains, main_company, main_company_domain, log_file_path):
     domains = [value for value in domains if not pd.isna(value) and isinstance(value, str) and value != "." and extract_main_part(value) not in social_media_domain_main_part]
 
     total_prompt_tokens = 0
@@ -720,7 +721,7 @@ def validate_agentsOutput_domains(domains, main_company, log_file_path):
     total_domains = len(domains)
     progress_step = 1 / total_domains
 
-    validate_single_correct_domains_with_log = partial(validate_single_correct_domains, log_file_path, main_company)
+    validate_single_correct_domains_with_log = partial(validate_single_correct_domains, log_file_path, main_company, main_company_domain)
 
     serialized_function = dill.dumps(validate_single_correct_domains_with_log)
 
