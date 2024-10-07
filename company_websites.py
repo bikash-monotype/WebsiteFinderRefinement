@@ -417,12 +417,16 @@ def get_official_websites(file_company_list, main_company, company_website, log_
                 total_website_researcher_prompt_tokens += llm_usage['prompt_tokens']
                 total_website_researcher_completion_tokens += llm_usage['completion_tokens']
                 total_website_researcher_serper_credits += result['serper_credits']
-                
-                for company, urls in websites.items():
-                    for url in urls:
-                        if extract_domain_name(url) == extract_domain_name(company_website):
-                            company_website_exists = True
-                        data.append({'Company Name': company, 'Website URL': url})
+
+                if isinstance(websites, dict):
+                    for company, urls in websites.items():
+                        for url in urls:
+                            if extract_domain_name(url) == extract_domain_name(company_website):
+                                company_website_exists = True
+                            data.append({'Company Name': company, 'Website URL': url})
+                else:
+                    with open(log_file_paths['log'], 'a') as f:
+                        f.write(f"Skipping result with non-dict 'websites' key: {result}")
             else:
                 with open(log_file_paths['log'], 'a') as f:
                     f.write(f"Skipping result with missing 'websites' or 'llm_usage' key: {result}")
