@@ -805,6 +805,8 @@ def validate_agentsOutput_domains(domains, main_company, main_company_domain, lo
     }
         
 
-# print(validate_domains_that_are_considered_correct_by_llm_in_google_search("https://www.wolfe.construction/", "Wolfe LLC", "test.log"))
+# print(validate_domains_that_are_considered_correct_by_llm_in_google_search("https://www.wolfe.construction/", "Wolfe LLC","https://www.wolfe.com/" ,"test.log"))
+# print(validate_domains_that_are_considered_correct_by_llm_in_google_search("https://www.giftya.com/", "Wolfe LLC","https://www.wolfe.com/" ,"test.log"))
+
 # print(validate_domains_that_are_considered_correct_by_llm_in_google_search("https://www.scppool.com/", "Pool Corporation", "test.log"))
 # print(validate_domains_that_are_considered_correct_by_llm_in_google_search("https://www.paaseastereggs.com/", "Signature Brands,LLC", "test.log"))
