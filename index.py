@@ -47,6 +47,7 @@ st.header("Company Details Search")
 with st.form(key="company_details_search"):
     sec_company_id = st.text_input("Company Id")
     company_name = st.text_input("Company Name")
+    company_website = st.text_input("Company Website")
     uploaded_file = st.file_uploader("Upload GTD", type=["xlsx"])
     
     submit_button = st.form_submit_button(label="Submit")
@@ -258,7 +259,7 @@ if submit_button:
             filtered_agents_output_list = export_df['Company Structure'].tolist()
     
         st.write("###### Finding official websites for the subsidiaries")
-        websites = get_official_websites(filtered_agents_output_list, company_name, log_file_paths)
+        websites = get_official_websites(filtered_agents_output_list, company_name, company_website, log_file_paths)
         total_cost_USD = calculate_openai_costs(websites['llm_usage']['prompt_tokens'], websites['llm_usage']['completion_tokens'])
 
         with open(log_file_paths['llm'], 'a') as f:
@@ -289,12 +290,7 @@ if submit_button:
 
         st.write("###### Find copyright for the subsidiaries")
 
-        unique_urls = set()
-
-        for entry in websites_research_data:
-            unique_urls.add(get_main_domain(entry.rstrip('/')))
-
-        copyrights = process_website_and_get_copyrights(unique_urls, log_file_paths)
+        copyrights = process_website_and_get_copyrights([get_main_domain(company_website.rstrip('/'))], log_file_paths)
 
         total_cost_USD = copyrights['llm_usage']['total_cost_USD']
 
@@ -312,7 +308,7 @@ if submit_button:
         file_path = os.path.join(final_results_directory, 'website_research_agent.xlsx')
         export_df = pd.read_excel(file_path)
 
-        export_df['Copyright'] = export_df['Website URL'].map(copyrights['copyrights'])
+        export_df.loc[0, 'Copyright'] = next(iter(copyrights['copyrights'].values()))
         export_df.to_excel(file_path, index=False, header=True)
 
         st.write("###### Find websites using copyright")
@@ -321,9 +317,8 @@ if submit_button:
 
         data = export_df[['Company Name', 'Copyright']]
         data_cleaned = data.replace('N/A', np.nan).dropna(subset=['Copyright'])
-        unique_copyrights = data_cleaned.drop_duplicates(subset=['Copyright'])
 
-        copyright_research = process_copyright_research(unique_copyrights, log_file_paths)
+        copyright_research = process_copyright_research(data_cleaned, log_file_paths)
         with open(log_file_paths['serper'], 'a') as f:
             f.write("\n\n")
             f.write(f"Finding websites using copyright search:\n")
@@ -390,7 +385,6 @@ if submit_button:
         validation_input_path = f"./validation_input/{company_name}_validation.xlsx"
         validation_df.to_excel(validation_input_path)
 
-
         st.write("############### Completing the agentic run #########################")
         st.write("############### Starting the validation #########################")
 
@@ -398,5 +392,4 @@ if submit_button:
 
     except Exception as e:
         st.error(f"An error occurred: {e}")
-
 

@@ -10,7 +10,7 @@ from functools import partial
 from helpers import extract_domain_name
 from copyright import get_copyright
 import re
-from helpers import extract_year, extract_main_part, get_links, process_worker_function, tokenize_text
+from helpers import extract_year, extract_main_part, get_links, process_worker_function, tokenize_text, extract_domain_name
 import dill
 from dotenv import load_dotenv
 import time
@@ -377,7 +377,7 @@ def process_copyright_research(unique_copyrights, log_file_paths):
         'serper_credits': total_serper_credits
     }
 
-def get_official_websites(file_company_list, main_company, log_file_paths):
+def get_official_websites(file_company_list, main_company, company_website, log_file_paths):
     sample_expert_website_researcher_output = {
         'subdisiary_name1': [
             'https://www.subdisiary_name1.com',
@@ -407,6 +407,7 @@ def get_official_websites(file_company_list, main_company, log_file_paths):
     total_website_researcher_serper_credits = 0
 
     data = []
+    company_website_exists = False
     for result in final_results:
         if isinstance(result, dict):
             if 'websites' in result and 'llm_usage' in result:
@@ -419,6 +420,8 @@ def get_official_websites(file_company_list, main_company, log_file_paths):
                 
                 for company, urls in websites.items():
                     for url in urls:
+                        if extract_domain_name(url) == extract_domain_name(company_website):
+                            company_website_exists = True
                         data.append({'Company Name': company, 'Website URL': url})
             else:
                 with open(log_file_paths['log'], 'a') as f:
@@ -426,6 +429,10 @@ def get_official_websites(file_company_list, main_company, log_file_paths):
         else:
             with open(log_file_paths['log'], 'a') as f:
                 f.write(f"Skipping non-dict result from expert website researcher: {result}")
+
+    if company_website_exists is False:
+        data.append({'Company Name': main_company, 'Website URL': company_website})
+    
     return {
         'data': data,
         'llm_usage': {
