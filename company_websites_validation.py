@@ -466,6 +466,90 @@ def validate_domains_that_are_considered_correct_by_llm_in_google_search(url, ma
             """
         )
 
+        prompt = (
+            f"""
+            Task Objective:
+        Determine whether the specified domain is formally associated with the company owning the main website by being part of its subsidiaries, brands, or formal partnerships involving ownership stakes or equity relationships. Exclude any instances where the domain appears as a third-party tool, service, advertisement, or reporting platform, or is associated through license agreements or non-equity partnerships, without formal ownership or stake-based association.
+        
+        domain:{url}
+        main website:{main_company}
+        
+        Task Breakdown:
+        Presence Verification:
+        
+        Search the provided website ({url}) to determine if it is part of or associated with the specified company ({main_company}).
+        Ownership and Association Analysis of {main_company}:
+        
+        Strict Exact Copyright Matching Only:
+        Start by checking the copyright section, usually in the website's footer, for explicit ownership details. Only consider the domain as associated if there is an exact match of "© [{main_company}]". Ignore any variations, additional text, or differences in the company name.
+        
+        The main company name must be exact; nothing else is allowed. For example, "abc inc" and "abc xyz inc" should be treated differently and are not considered exact matches.
+        
+        Focus on Textual Ownership Mentions: Look for textual confirmation of ownership, especially in legal documents or the "About Us" section, but only after confirming the exact copyright match.
+        
+        Confirm if the domain is associated with the company in one of the following ways:
+        
+        Subsidiaries: Verify if the domain belongs to a subsidiary of the company. Look for corporate ownership listings or related documentation.
+        Brands: Identify if the domain represents a brand of the company. This includes domains for products, services, or divisions under the company’s umbrella.
+        Partnerships with Stakes: Determine if the domain is part of a formal partnership where the company holds stakes or equity-based investments.
+        Acquisitions: Check if the domain was acquired or merged into the company.
+        Cross-Verification:
+        
+        Verify Ownership Consistency: Ensure that all sections of the website (e.g., About Us, Contact, Footer) consistently indicate ownership by {main_company} or its subsidiaries/brands.
+        Check Domain Registration: Where possible, verify the domain registration details to confirm ownership by the company or its affiliates.
+        Handling Third-Party Services and Tools:
+        
+        Exclude third-party tools or services (e.g., analytics, marketing, IT services) unless they are owned or directly managed by the company or its subsidiaries.
+        If the domain belongs to a third-party tool or service without ownership ties (e.g., external financial platforms, marketplaces, or unrelated service providers), it should be excluded as not formally associated.
+        Exclusion of Non-Ownership Mentions:
+        
+        Exclude any domain that appears as a:
+        Service provider
+        Advertisement platform
+        Reporting platform
+        Tool
+        Without ownership, branding, or equity-based partnerships with the company.
+        Verification of Explicit Ownership Indicators:
+        
+        Primary Focus on Exact Copyright Match:
+        Footer: Confirm the presence of an exact match of "© [{main_company}]" in the footer. This is the primary source of ownership confirmation.
+        About Us & Legal Notices: Only consider these sections if the exact copyright match is found.
+        Avoid Relying Solely on Visual Elements:
+        Do not assume ownership based solely on visual branding or logos without textual confirmation.
+        Verification of Ownership Clarity:
+        
+        If explicit ownership details are not available or the relationship is unclear, set the ownership_not_clear field to "Yes."
+        If ownership is clearly stated or verified through the exact copyright match, set ownership_not_clear to "No."
+        Output Format:
+        Return the following JSON format: {sample_json_output}
+        
+        #####
+        Important Instructions:
+        Strict Exact Copyright Matching
+        Only consider the domain as associated if there is an exact match of "© {main_company}" in the footer.
+        Do not accept variations like additional text, different years, or company suffixes (e.g., "Inc.", "LLC").
+        **The main company name must be exact; nothing else is allowed. For example, "abc inc" and "abc xyz inc" should be treated differently and are not considered exact matches.**
+        Prioritize Ownership and Association Analysis:
+        After confirming the exact copyright match, proceed to identify explicit ownership, brand affiliation, subsidiaries, or equity-based partnerships.
+        
+        Exclude License-Based Associations:
+        Domains associated through licensing agreements without ownership or equity stakes should be excluded. This includes situations where the company provides services under license but does not own the domain.
+        
+        Exclude Reporting Platforms and Unrelated Tools/Services:
+        Websites that report on or discuss the company’s activities or offer unrelated services without formal ownership should be excluded.
+        
+        Focus on Ownership and Stakes:
+        Only include domains that are tied to the company through ownership stakes or equity-based relationships. Exclude collaborations, licenses, or third-party agreements without ownership.
+        
+        Avoid Assumptions:
+        Do not infer associations based on partial information or general references. Only classify as "Yes" when there is clear evidence of formal ownership or equity-based association.
+        
+        Ownership Clarity: Set ownership_not_clear to "Yes" if the ownership is not clearly mentioned; otherwise, set it to "No."
+        
+        YOU CANNOT MAKE ANY ASSUMPTIONS. Exclude the domain if ownership is tied to an individual rather than the company entity.                    
+        """
+        )
+
         smart_scraper_graph = SmartScraperGraph(
             prompt=prompt,
             source=url,
@@ -792,4 +876,7 @@ def validate_agentsOutput_domains(domains, main_company, log_file_path):
         'total_serper_credits': total_serper_credits
     }
         
-    
+
+# print(validate_domains_that_are_considered_correct_by_llm_in_google_search("https://www.wolfe.construction/", "Wolfe LLC", "test.log"))
+# print(validate_domains_that_are_considered_correct_by_llm_in_google_search("https://www.scppool.com/", "Pool Corporation", "test.log"))
+# print(validate_domains_that_are_considered_correct_by_llm_in_google_search("https://www.paaseastereggs.com/", "Signature Brands,LLC", "test.log"))

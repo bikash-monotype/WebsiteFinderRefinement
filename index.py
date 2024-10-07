@@ -14,6 +14,7 @@ import dill
 import numpy as np
 from company_websites_validation import validate_agentsOutput_domains, validate_linkgrabber_domains
 import json
+from accuracy_with_gtd import awgtd
 
 load_dotenv()
 
@@ -27,13 +28,13 @@ st.header("Company Search")
 with st.form(key="company_search"):
     cik_number = st.text_input("CIK Number")
     company_name = st.text_input("Company Name")
-    
+
     submit_button = st.form_submit_button(label="Submit")
 
 if submit_button:
     try:
         response = requests.get(f"{base_url}{api_version}catalyst/sec/company?search={company_name}&cik_number={cik_number}&page=1&page_size=10")
-        
+
         if response.status_code == 200:
             st.success("Companies fetched successfully!")
             st.write("API Response:", response.json())
@@ -49,7 +50,7 @@ with st.form(key="company_details_search"):
     company_name = st.text_input("Company Name")
     company_website = st.text_input("Company Website")
     uploaded_file = st.file_uploader("Upload GTD", type=["xlsx"])
-    
+
     submit_button = st.form_submit_button(label="Submit")
 
 if submit_button:
@@ -136,7 +137,7 @@ if submit_button:
 
             if all_links['links'] is not None:
                 urls.extend(all_links['links'])
-           
+
         urls = list(set(urls))
 
         with open(log_file_paths['links'], 'a') as f:
@@ -151,9 +152,9 @@ if submit_button:
         progress_step = 1 / total_urls
 
         fetch_company_structures_with_log = partial(get_company_structures, company_name, log_file_paths)
-    
+
         serialized_function = dill.dumps(fetch_company_structures_with_log)
-    
+
         with multiprocessing.Pool(processes=10) as pool:
             results = []
             for i, result in enumerate(pool.imap(partial(process_worker_function, serialized_function), urls), 1):
@@ -202,7 +203,7 @@ if submit_button:
             export_df = pd.read_excel(os.path.join(final_results_directory, 'company_structures.xlsx'))
 
             company_structure_set = export_df['Company Structure'].tolist()
-            
+
             valid_subsidiaries = validate_company_structure(company_structure_set, company_name, log_file_paths)
 
             export_df = pd.DataFrame({
@@ -257,7 +258,7 @@ if submit_button:
             export_df = pd.read_excel(os.path.join(final_results_directory, 'company_structures' + '.xlsx'))
 
             filtered_agents_output_list = export_df['Company Structure'].tolist()
-    
+
         st.write("###### Finding official websites for the subsidiaries")
         websites = get_official_websites(filtered_agents_output_list, company_name, company_website, log_file_paths)
         total_cost_USD = calculate_openai_costs(websites['llm_usage']['prompt_tokens'], websites['llm_usage']['completion_tokens'])
@@ -381,14 +382,17 @@ if submit_button:
         df = pd.DataFrame(combined_final_results, columns=['Website URL'])
         df.to_excel(os.path.join(final_results_directory, 'combined_final_results' + '.xlsx'), index=False, header=True)
 
-        validation_df = pd.concat([gtd, df], axis=1, keys=["GTD", "AgentsOutput"])
+        validation_df = pd.concat([gtd, df], axis=1, columns=["GTD", "AgentsOutput"])
         validation_input_path = f"./validation_input/{company_name}_validation.xlsx"
-        validation_df.to_excel(validation_input_path)
+        validation_df.to_excel(validation_input_path, index=False)
+
+        with open('final_results/Skiplagged_20241007152734/link_grabber_agent.json', 'r') as json_file:
+            link_grabber_results = json.load(json_file)
 
         st.write("############### Completing the agentic run #########################")
         st.write("############### Starting the validation #########################")
 
-        os.system(f"python accuracy-with-gtd.py --validation_df '{validation_input_path}' --link_grabber '{os.path.join(final_results_directory, 'link_grabber_agent.json')}' --company_name '{company_name}'")
+        awgtd(validation_df,link_grabber_results,company_name)
 
     except Exception as e:
         st.error(f"An error occurred: {e}")
