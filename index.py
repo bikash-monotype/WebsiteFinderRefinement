@@ -33,7 +33,12 @@ with st.form(key="company_search"):
 
 if submit_button:
     try:
-        response = requests.get(f"{base_url}{api_version}catalyst/sec/company?search={company_name}&cik_number={cik_number}&page=1&page_size=10")
+        if cik_number:
+            url = f"{base_url}{api_version}catalyst/sec/company?search={company_name}&cik_number={cik_number}&page=1&page_size=10"
+        else:
+            url = f"{base_url}{api_version}catalyst/sec/company?search={company_name}&page=1&page_size=10"
+
+        response = requests.get(url)
 
         if response.status_code == 200:
             st.success("Companies fetched successfully!")
