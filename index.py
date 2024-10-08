@@ -382,17 +382,18 @@ if submit_button:
         df = pd.DataFrame(combined_final_results, columns=['Website URL'])
         df.to_excel(os.path.join(final_results_directory, 'combined_final_results' + '.xlsx'), index=False, header=True)
 
-        validation_df = pd.concat([gtd, df], axis=1, columns=["GTD", "AgentsOutput"])
+        validation_df = pd.concat([gtd, df], axis=1)
+        validation_df.columns = ["GTD", "AgentsOutput"]
         validation_input_path = f"./validation_input/{company_name}_validation.xlsx"
         validation_df.to_excel(validation_input_path, index=False)
 
-        with open('final_results/Skiplagged_20241007152734/link_grabber_agent.json', 'r') as json_file:
+        with open(os.path.join(final_results_directory, 'link_grabber_agent.json'), 'r') as json_file:
             link_grabber_results = json.load(json_file)
 
         st.write("############### Completing the agentic run #########################")
         st.write("############### Starting the validation #########################")
 
-        awgtd(validation_df,link_grabber_results,company_name)
+        # awgtd(validation_df,link_grabber_results,company_name)
 
     except Exception as e:
         st.error(f"An error occurred: {e}")
