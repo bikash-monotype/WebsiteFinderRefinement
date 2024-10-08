@@ -82,6 +82,22 @@ def validate_working_single_domain(log_file_path, domain):
     
 def validate_single_correct_domains(log_file_paths, main_company, main_company_domain, main_copyright_text, domain):
     try:
+        if domain == extract_domain_name(main_company_domain):
+            print('I ran Bikash')
+            return {
+                'results': [domain, 'Yes', 'Main company domain'],
+                'llm_usage1': {
+                    'prompt_tokens': 0,
+                    'completion_tokens': 0
+                },
+                'llm_usage2': {
+                    'prompt_tokens': 0,
+                    'completion_tokens': 0,
+                    'total_cost_USD': 0
+                },
+                'serper_credits': 0
+            }
+
         total_serper_credits = 0
 
         total_prompt_tokens2 = 0
@@ -395,7 +411,7 @@ def validate_domains_that_are_considered_correct_by_llm_in_google_search(url, ma
             Exclude any instances where the domain appears as a third-party tool, service, advertisement, or reporting platform, or is associated through license agreements or non-equity partnerships, without formal ownership or stake-based association.
 
             **Domain:** {url}  
-            **Main Website:** {main_company}  
+            **Main Company:** {main_company}  
             **Main Company Domain:** {main_company_domain}
 
             ### **Task Breakdown:**
@@ -407,7 +423,7 @@ def validate_domains_that_are_considered_correct_by_llm_in_google_search(url, ma
 
             ##### **Strict Copyright Matching:**
             - Start by checking the copyright section, usually in the website's footer, for explicit ownership details.
-            - **First, try to find an exact match of "{main_copyright_text}" without considering the year. If an exact match is not found, then check if the copyright text includes a hyperlink to the main company's domain ({main_company_domain}) and mentions the company explicitly.** The hyperlink for phrases similar to "Part of [main_company]" (e.g., "A member of [main_company]", "Owned by [main_company]", or any similar phrase indicating formal ownership) must point to the main company's domain ({main_company_domain}) to confirm the association.
+            - **If {main_copyright_text} is not None, first try to find an exact match of "© {main_copyright_text}" without considering the year. If an exact match is not found, then check if the copyright text includes a hyperlink to the main company's domain ({main_company_domain}) and mentions the company explicitly.** The hyperlink for phrases similar to "Part of {main_company}" (e.g., "A member of {main_company}", "Owned by {main_company}", or any similar phrase indicating formal ownership) must point to the main company's domain ({main_company_domain}) to confirm the association.
             - **The main company name must be exact; nothing else is allowed.** For example, "abc inc" and "abc xyz inc" should be treated differently and are not considered exact matches.
 
             ##### **Focus on Textual Ownership Mentions:**
@@ -506,8 +522,20 @@ def validate_domains_that_are_considered_correct_by_llm_in_google_search(url, ma
             'graph_exec_info': None
         }
 
-def validate_single_correct_linkgrabber_domains(log_file_paths, main_company, domain_key_value):
+def validate_single_correct_linkgrabber_domains(log_file_paths, main_company, company_domain, domain_key_value):
     main_domain, domain = domain_key_value
+
+    if extract_domain_name(company_domain) == domain:
+        return {
+            'main_domain': main_domain,
+            'domain': domain,
+            'link': '',
+            'valid': 'Yes',
+            'reason': 'Main domain',
+            'graph_exec_info': None,
+            'total_serper_credits': 0
+        }
+
     total_serper_credits = 0
 
     search_results = search_multiple_page(f"site:{main_domain} {domain}", 10, 1, log_file_path=log_file_paths['log'])
@@ -525,7 +553,7 @@ def validate_single_correct_linkgrabber_domains(log_file_paths, main_company, do
         }
     
     try :
-        sample_json_output = json.dumps({'valid': 'Yes/No', 'reason': 'Reason for True or False value'})
+        sample_json_output = json.dumps({'valid': 'Yes/No', 'reason': 'Reason for Yes or No value'})
 
         prompt = (
             f"""
@@ -629,7 +657,7 @@ def validate_single_correct_linkgrabber_domains(log_file_paths, main_company, do
             'total_serper_credits': total_serper_credits
         }
 
-def validate_linkgrabber_domains(main_company, domains, log_file_path):
+def validate_linkgrabber_domains(main_company, company_domain, domains, log_file_path):
     domains_key_value = []
 
     st.write('###### Remove incorrect linkgrabber domains')
@@ -643,7 +671,7 @@ def validate_linkgrabber_domains(main_company, domains, log_file_path):
     total_domains = len(domains_key_value)
     progress_step = 1 / total_domains
 
-    validate_single_correct_domains_with_log = partial(validate_single_correct_linkgrabber_domains, log_file_path, main_company)
+    validate_single_correct_domains_with_log = partial(validate_single_correct_linkgrabber_domains, log_file_path, main_company, company_domain)
 
     serialized_function = dill.dumps(validate_single_correct_domains_with_log)
 
@@ -669,7 +697,7 @@ def validate_linkgrabber_domains(main_company, domains, log_file_path):
     for res in results:
         validation_domain_with_reason.append([res['main_domain'], res['domain'], res['valid'], res['reason'], res['link']])
 
-        if res['valid'] == 'True':
+        if res['valid'] == 'Yes':
             valid_working_domains.add(res['domain'])
         else:
             invalid_non_working_domains.add(res['domain'])

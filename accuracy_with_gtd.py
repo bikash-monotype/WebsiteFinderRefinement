@@ -99,7 +99,7 @@ def awgtd(df,link_grabber_data,company_name,company_website):
                                     filtered_link_grabber_data[main_domain] = [domain]
 
             if len(filtered_link_grabber_data) != 0:
-                response2 = validate_linkgrabber_domains(company_name, filtered_link_grabber_data, log_file_paths)
+                response2 = validate_linkgrabber_domains(company_name, company_domain, filtered_link_grabber_data, log_file_paths)
 
                 export_df = pd.DataFrame(response2['link_grabber_validation_AI_responses'],
                                          columns=['Main Domain', 'Domain', 'AI Response', 'Reason', 'Url'])
