@@ -460,10 +460,10 @@ def validate_domains_that_are_considered_correct_by_llm_in_google_search(url, ma
             - After attempting the copyright match, proceed to identify explicit ownership, brand affiliation, subsidiaries, or equity-based partnerships.
 
             #### **Exclude License-Based Associations:**
-            - **Domains associated through licensing agreements without ownership or equity stakes should be excluded.** This includes situations where the company provides services under license but does not own the domain.
+            - **Domains associated through licensing agreements without ownership or equity stakes should be excluded.** This includes situations where the company provides services under license (e.g., financial cards issued by a bank, prepaid cards issued by a financial institution, bank accounts established by a financial institution) but does not own the domain or explicitly control its operations. Any mention of the domain being issued by or under license is insufficient to establish ownership. Any mention of the domain being issued by or under license (e.g., "issued by Pathward") is insufficient to establish ownership.
 
             #### **Exclude Reporting Platforms and Unrelated Tools/Services:**
-            - Websites that report on or discuss the company’s activities or offer unrelated services without formal ownership should be excluded.
+            - Websites that report on or discuss the company's activities or offer unrelated services without formal ownership should be excluded.
 
             #### **Focus on Ownership and Stakes:**
             - Only include domains that are tied to the company through ownership stakes or equity-based relationships. Exclude collaborations, licenses, or third-party agreements without ownership.
