@@ -5,17 +5,25 @@ from helpers import create_result_directory, extract_domain_name, pad_list, soci
 import os
 from company_websites_validation import validate_agentsOutput_domains, validate_working_domains, validate_linkgrabber_domains
 import json
+from company_websites import process_single_website
+import re
 
-def awgtd(df,link_grabber_data,company_name):
+def clean_url(url):
+    url = re.sub(r'^https?://', '', url)
+    url = re.sub(r'^www\.', '', url)
+    return f"https://{url}"
+
+def awgtd(df,link_grabber_data,company_name,company_website):
         if True:
             print("Processing file...")
             start_time = datetime.now()
             gtd = df['GTD'].tolist()
             agentsOutput = df['AgentsOutput'].tolist()
 
-            gtd = [value for value in gtd if not pd.isna(value) and value != "GTD"]
-
-            agentsOutput = [value for value in agentsOutput if not pd.isna(value) and isinstance(value, str) and value != "." and extract_main_part(value) not in social_media_domain_main_part]
+            gtd = [value for value in gtd if not pd.isna(value)]
+            agentsOutput = [value for value in agentsOutput if
+                            not pd.isna(value) and isinstance(value, str) and value != "." and extract_main_part(
+                                value) not in social_media_domain_main_part]
 
             gtd = [extract_domain_name(url) for url in gtd]
             gtd = set(gtd)
@@ -35,28 +43,48 @@ def awgtd(df,link_grabber_data,company_name):
             whole_process_serper_credits = 0
 
             st.markdown(f"""
-                <style>
-                    .output-folder {{
-                        color: green;
-                        font-weight: bold;
-                    }}
-                </style>
-                <div class="output-folder">
-                    The output folder is: {result_directory}. Please remember this for future reference.
-                </div>
-            """, unsafe_allow_html=True)
+                        <style>
+                            .output-folder {{
+                                color: green;
+                                font-weight: bold;
+                            }}
+                        </style>
+                        <div class="output-folder">
+                            The output folder is: {result_directory}. Please remember this for future reference.
+                        </div>
+                    """, unsafe_allow_html=True)
 
-            response = validate_agentsOutput_domains(agentsOutput, company_name, log_file_paths)
+            copyright = process_single_website(company_website, log_file_paths)
+            copyright_text = copyright['result']['result']['copyright']
 
-            export_df = pd.DataFrame(response['agentsOutput_validation_AI_responses'], columns=['Domain', 'Ownership Not Clear', 'AI Response', 'Url', 'Reason'])
+            with open(log_file_paths['log'], 'a') as f:
+                f.write("\n\n")
+                f.write(f"Get Copyright of main domain: {copyright_text}")
 
-            export_df.to_excel(os.path.join(final_results_directory, 'agentsOutput_validation_AI_responses.xlsx'), index=False, header=True)
+            if copyright['result']['exec_info'] is not None:
+                for exec_info in copyright['result']['exec_info']:
+                    if exec_info['node_name'] == 'TOTAL RESULT':
+                        whole_process_prompt_tokens += exec_info.get('prompt_tokens', 0)
+                        whole_process_completion_tokens += exec_info.get('completion_tokens', 0)
+                        whole_process_llm_costs += exec_info.get('total_cost_USD', 0.0)
+
+            company_domain = clean_url(company_website)
+            response = validate_agentsOutput_domains(agentsOutput, company_name, company_domain, copyright_text,
+                                                     log_file_paths)
+
+            export_df = pd.DataFrame(response['agentsOutput_validation_AI_responses'],
+                                     columns=['Domain', 'Ownership Not Clear', 'AI Response', 'Url', 'Reason'])
+
+            export_df.to_excel(os.path.join(final_results_directory, 'agentsOutput_validation_AI_responses.xlsx'),
+                               index=False, header=True)
 
             export_df = pd.DataFrame({
                 'Domains': response['invalid_non_working_domains'],
             })
 
-            export_df.to_excel(os.path.join(final_results_directory, 'invalid_non_working_domains_excluding_linkgrabber.xlsx'), index=False, header=True)
+            export_df.to_excel(
+                os.path.join(final_results_directory, 'invalid_non_working_domains_excluding_linkgrabber.xlsx'),
+                index=False, header=True)
 
             filtered_link_grabber_data = {}
 
@@ -73,15 +101,19 @@ def awgtd(df,link_grabber_data,company_name):
             if len(filtered_link_grabber_data) != 0:
                 response2 = validate_linkgrabber_domains(company_name, filtered_link_grabber_data, log_file_paths)
 
-                export_df = pd.DataFrame(response2['link_grabber_validation_AI_responses'], columns=['Main Domain', 'Domain', 'AI Response', 'Reason', 'Url'])
+                export_df = pd.DataFrame(response2['link_grabber_validation_AI_responses'],
+                                         columns=['Main Domain', 'Domain', 'AI Response', 'Reason', 'Url'])
 
-                export_df.to_excel(os.path.join(final_results_directory, 'link_grabber_validation_AI_responses.xlsx'), index=False, header=True)
+                export_df.to_excel(os.path.join(final_results_directory, 'link_grabber_validation_AI_responses.xlsx'),
+                                   index=False, header=True)
 
                 export_df = pd.DataFrame({
                     'Domains': response2['invalid_non_working_domains'],
                 })
 
-                export_df.to_excel(os.path.join(final_results_directory, 'invalid_non_working_domains_of_linkgrabber.xlsx'), index=False, header=True)
+                export_df.to_excel(
+                    os.path.join(final_results_directory, 'invalid_non_working_domains_of_linkgrabber.xlsx'),
+                    index=False, header=True)
 
                 valid_domains = set(response['valid_working_domains'] + response2['valid_working_domains'])
 
@@ -92,34 +124,10 @@ def awgtd(df,link_grabber_data,company_name):
             else:
                 valid_domains = set(response['valid_working_domains'])
 
-            # st.write('###### Validate Ground Truth')
-
-            # response2 = validate_working_domains(gtd, log_file_paths)
-
-            # valid_gtd = response2['valid_working_domains']
-
             whole_process_prompt_tokens += response['total_prompt_tokens']
             whole_process_completion_tokens += response['total_completion_tokens']
             whole_process_llm_costs += response['total_cost_USD']
             whole_process_serper_credits += response['total_serper_credits']
-
-            # whole_process_prompt_tokens += response2['total_prompt_tokens']
-            # whole_process_completion_tokens += response2['total_completion_tokens']
-            # whole_process_llm_costs += response2['total_cost_USD']
-
-            # export_df = pd.DataFrame({
-            #     'Domains': response['invalid_non_working_domains'].keys(),
-            #     'Reason': response['invalid_non_working_domains'].values()
-            # })
-
-            # export_df.to_excel(os.path.join(final_results_directory, 'invalid_non_working_domains.xlsx'), index=False, header=True)
-
-            # export_df = pd.DataFrame({
-            #     'Domains': response2['invalid_non_working_domains'].keys(),
-            #     'Reason': response2['invalid_non_working_domains'].values()
-            # })
-
-            # export_df.to_excel(os.path.join(final_results_directory, 'invalid_gtd.xlsx'), index=False, header=True)
 
             with open(log_file_paths['serper'], 'a') as f:
                 f.write("\n\n")
@@ -149,34 +157,31 @@ def awgtd(df,link_grabber_data,company_name):
             new_values_in_valid_output = set(valid_domains).difference(gtd)
             new_values_in_valid_output = list(new_values_in_valid_output)
 
-            accuracy = ((len(common_values) + len(new_values_in_valid_output)) / (len(gtd) + len(new_values_in_valid_output))) * 100
+            accuracy = ((len(common_values) + len(new_values_in_valid_output)) / (
+                        len(gtd) + len(new_values_in_valid_output))) * 100
 
-            max_length = max(len(agentsOutput), len(new_values_in_valid_output), len(gtd), len(common_values), len(valid_domains), len(missing_values_in_gtd))
-            # max_length = max(len(agentsOutput))
+            max_length = max(len(agentsOutput), len(new_values_in_valid_output), len(gtd), len(common_values),
+                             len(valid_domains), len(missing_values_in_gtd))
 
             res_data = {
                 "Company Name": [f"{company_name}"],
                 'GTD': [len(gtd)],
-                # 'Valid GTD': [len(valid_gtd)],
-                # "Invalid GTD":[len(list(response2['invalid_non_working_domains'].keys()))],
                 'AgentsOutput': [len(agentsOutput)],
                 'Valid AgentsOutput': [len(list(valid_domains))],
                 'Common Values': [len(common_values)],
-                'Missing Values from GTD':[len(missing_values_in_gtd)],
-                'New Values in Valid Output':[len(new_values_in_valid_output)],
+                'Missing Values from GTD': [len(missing_values_in_gtd)],
+                'New Values in Valid Output': [len(new_values_in_valid_output)],
                 'Accuracy': [accuracy],
                 'Folder': [result_directory]
             }
 
             res_df = pd.DataFrame(res_data)
 
-            acc_df = pd.read_excel("validation/Accuracy_New.xlsx",engine = "openpyxl")
-            acc_df = pd.concat([acc_df,res_df])
+            acc_df = pd.read_excel("validation/Accuracy_New.xlsx", engine="openpyxl")
+            acc_df = pd.concat([acc_df, res_df])
             acc_df.to_excel("validation/Accuracy_New.xlsx", index=False, engine="openpyxl")
 
             gtd = pad_list(gtd, max_length)
-            # valid_gtd = pad_list(valid_gtd, max_length)
-            # invalid_gtd = pad_list(list(response2['invalid_non_working_domains'].keys()), max_length)
             agentsOutput = pad_list(agentsOutput, max_length)
             valid_agentsOutput = pad_list(list(valid_domains), max_length)
             common_values = pad_list(common_values, max_length)
@@ -186,8 +191,6 @@ def awgtd(df,link_grabber_data,company_name):
 
             export_df = pd.DataFrame({
                 'GTD': gtd,
-                # 'Valid GTD': valid_gtd,
-                # 'Invalid GTD': invalid_gtd,
                 'AgentsOutput': agentsOutput,
                 'Valid AgentsOutput': valid_agentsOutput,
                 'Common Values': common_values,

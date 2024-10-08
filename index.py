@@ -393,7 +393,7 @@ if submit_button:
         st.write("############### Completing the agentic run #########################")
         st.write("############### Starting the validation #########################")
 
-        # awgtd(validation_df,link_grabber_results,company_name)
+        awgtd(validation_df,link_grabber_results,company_name,company_website)
 
     except Exception as e:
         st.error(f"An error occurred: {e}")
