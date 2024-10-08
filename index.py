@@ -34,9 +34,9 @@ with st.form(key="company_search"):
 if submit_button:
     try:
         if cik_number:
-            url = f"{base_url}{api_version}catalyst/sec/company?search={company_name}&cik_number={cik_number}&page=1&page_size=10"
+            url = f"{base_url}{api_version}catalyst/sec/company?search={company_name}&cik_number={cik_number}&page=1&page_size=100"
         else:
-            url = f"{base_url}{api_version}catalyst/sec/company?search={company_name}&page=1&page_size=10"
+            url = f"{base_url}{api_version}catalyst/sec/company?search={company_name}&page=1&page_size=100"
 
         response = requests.get(url)
 
