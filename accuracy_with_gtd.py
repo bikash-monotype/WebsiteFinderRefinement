@@ -13,10 +13,9 @@ def clean_url(url):
     url = re.sub(r'^www\.', '', url)
     return f"https://{url}"
 
-def awgtd(df,link_grabber_data,company_name,company_website):
+def awgtd(df,link_grabber_data,company_name,company_website,start_time):
         if True:
             print("Processing file...")
-            start_time = datetime.now()
             gtd = df['GTD'].tolist()
             agentsOutput = df['AgentsOutput'].tolist()
 
