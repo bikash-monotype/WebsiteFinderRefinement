@@ -83,9 +83,8 @@ def validate_working_single_domain(log_file_path, domain):
 def validate_single_correct_domains(log_file_paths, main_company, main_company_domain, main_copyright_text, domain):
     try:
         if domain == extract_domain_name(main_company_domain):
-            print('I ran Bikash')
             return {
-                'results': [domain, 'Yes', 'Main company domain'],
+                'results': [domain, 'Yes', 'Main company domain', '', ''],
                 'llm_usage1': {
                     'prompt_tokens': 0,
                     'completion_tokens': 0
