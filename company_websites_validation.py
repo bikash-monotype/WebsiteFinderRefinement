@@ -11,7 +11,7 @@ import dill
 from helpers import process_worker_function, extract_domain_name, is_working_domain, is_regional_domain_enhanced, translate_text, chunk_list, extract_main_part, social_media_domain_main_part, get_netloc, get_main_domain
 from tools import search_multiple_page
 import json_repair
-from helpers import calculate_openai_costs, tokenize_text, get_all_links
+from helpers import calculate_openai_costs, tokenize_text, is_reachable
 import time
 import pandas as pd
 import json
@@ -514,7 +514,7 @@ def validate_domains_that_are_considered_correct_by_llm_in_google_search(url, ma
             f.write(f"Exception when validating domain {url} using scrapegraph AI: {e}")
         print(f"Exception when validating domain {url} using scrapegraph AI: {e}")
         return {
-            'is_company_domain': result['is_company_domain'],
+            'is_company_domain': 'No',
             'ownership_not_clear': 'Yes',
             'reason': f'Exception when validating domain {url} using scrapegraph AI',
             'link': url,
@@ -633,6 +633,20 @@ def validate_single_correct_linkgrabber_domains(log_file_paths, main_company, co
         result = smart_scraper_graph.run()
         graph_exec_info = smart_scraper_graph.get_execution_info()
 
+        if result['valid'] == 'Yes':
+            is_reachable_domain = is_reachable(domain)
+
+            if is_reachable_domain is False:
+                return {
+                    'main_domain': main_domain,
+                    'domain': domain,
+                    'reason': 'Domain is valid but not not reachable',
+                    'link': search_results['all_results'][0]['link'],
+                    'valid': 'No',
+                    'graph_exec_info': graph_exec_info,
+                    'total_serper_credits': total_serper_credits
+                }
+
         return {
             'main_domain': main_domain,
             'domain': domain,
@@ -650,7 +664,7 @@ def validate_single_correct_linkgrabber_domains(log_file_paths, main_company, co
             'main_domain': main_domain,
             'domain': domain,
             'link': search_results['all_results'][0]['link'],
-            'valid': 'False',
+            'valid': 'No',
             'reason': f'Exception when validating domain using scrapegraph AI: {e}',
             'graph_exec_info': None,
             'total_serper_credits': total_serper_credits

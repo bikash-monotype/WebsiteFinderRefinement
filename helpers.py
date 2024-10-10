@@ -294,6 +294,24 @@ def get_links(url, log_file_path):
         extract_domain_name(url): list(fin)
     }
 
+def is_reachable(url):
+    if not url.startswith('http://') and not url.startswith('https://'):
+        url = f'https://{url}'
+
+    with sync_playwright() as p:
+        try:
+            browser = p.chromium.launch(headless=False, args=['--disable-http2'])
+            page = browser.new_page()
+            page.goto(url, timeout=100000)
+
+            return True
+        except Exception as e:
+            print(e)
+            return False
+        finally:
+            if page is not None:
+                page.close()
+
 def get_all_links(url, log_file_path):
     print(url)
     max_retries = 3
@@ -304,7 +322,7 @@ def get_all_links(url, log_file_path):
             try:
                 browser = p.chromium.launch(headless=False, args=['--disable-http2'])
                 page = browser.new_page()
-                page.goto(url, timeout=100000)
+                page.goto(url, timeout=80000)
                 
                 page.wait_for_load_state('load')
                 time.sleep(8)
