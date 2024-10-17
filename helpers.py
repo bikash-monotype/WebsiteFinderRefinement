@@ -352,6 +352,3 @@ def get_all_links(url, log_file_path):
                 if page is not None:
                     page.close()
     return links
-
-response = is_subdomain('https://www.extremenetworks.com/')
-print(response)

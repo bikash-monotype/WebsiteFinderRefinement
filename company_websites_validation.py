@@ -489,6 +489,9 @@ def validate_domains_that_are_considered_correct_by_llm_in_google_search(url, ma
             #### **Ownership Clarity:**
             - Set `ownership_not_clear` to "Yes" if the ownership is not clearly mentioned; otherwise, set it to "No."
 
+            #### **Reason:**
+            - Please provide a clear reason for your decision, indicating why the domain is or is not formally associated with the company. Do not provide speculative or ambiguous reasons.
+
             **YOU CANNOT MAKE ANY ASSUMPTIONS. Exclude the domain if ownership is tied to an individual rather than the company entity.**
             """
         )
@@ -619,6 +622,8 @@ def validate_single_correct_linkgrabber_domains(log_file_paths, main_company, co
                 Only include domains that are tied to the company through ownership stakes or equity-based relationships. Exclude collaborations, licenses, or third-party agreements without ownership.
                 - **Avoid Assumptions:**  
                 Do not infer associations based on partial information or general references. Only classify as "Yes" when there is clear evidence of formal ownership or equity-based association.
+                - **Reason:**
+                Please provide a clear reason for your decision, indicating why the domain is or is not formally associated with the company. Do not provide speculative or ambiguous reasons.
 
                 YOU CANNOT MAKE ANY ASSUMPTIONS.
             """
