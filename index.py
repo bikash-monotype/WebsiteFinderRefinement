@@ -69,6 +69,8 @@ if submit_button:
         if uploaded_file is not None:
             st.write(f"File '{uploaded_file.name}' has been uploaded successfully.")
             gtd = pd.read_excel(uploaded_file)
+        else:
+            gtd = []
 
         whole_process_prompt_tokens = 0
         whole_process_completion_tokens = 0
@@ -398,7 +400,9 @@ if submit_button:
         st.write("############### Completing the agentic run #########################")
         st.write("############### Starting the validation #########################")
 
-        awgtd(validation_df,link_grabber_results,company_name,company_website,start_time)
+
+
+        awgtd(validation_df,link_grabber_results,company_name,company_website,start_time,filtered_agents_output_list)
 
     except Exception as e:
         st.error(f"An error occurred: {e}")

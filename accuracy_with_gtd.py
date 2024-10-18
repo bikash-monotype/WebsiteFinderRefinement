@@ -13,7 +13,7 @@ def clean_url(url):
     url = re.sub(r'^www\.', '', url)
     return f"https://{url}"
 
-def awgtd(df,link_grabber_data,company_name,company_website,start_time):
+def awgtd(df,link_grabber_data,company_name,company_website,start_time,filtered_agents_output_list):
         if True:
             print("Processing file...")
             gtd = df['GTD'].tolist()
@@ -77,6 +77,8 @@ def awgtd(df,link_grabber_data,company_name,company_website,start_time):
             export_df.to_excel(os.path.join(final_results_directory, 'agentsOutput_validation_AI_responses.xlsx'),
                                index=False, header=True)
 
+            exp1 = export_df[export_df["AI Response"] == 'Yes'][['Domain', 'Url', 'Reason']]
+
             export_df = pd.DataFrame({
                 'Domains': response['invalid_non_working_domains'],
             })
@@ -105,6 +107,8 @@ def awgtd(df,link_grabber_data,company_name,company_website,start_time):
 
                 export_df.to_excel(os.path.join(final_results_directory, 'link_grabber_validation_AI_responses.xlsx'),
                                    index=False, header=True)
+
+                exp2 = export_df[export_df["AI Response"] == 'Yes'][['Domain', 'Url', 'Reason']]
 
                 export_df = pd.DataFrame({
                     'Domains': response2['invalid_non_working_domains'],
@@ -145,7 +149,28 @@ def awgtd(df,link_grabber_data,company_name,company_website,start_time):
             st.write(f"Total Cost in USD: {whole_process_llm_costs}")
             st.write(f"Total Serper Credits: {whole_process_serper_credits}")
 
-            endtime = datetime.now() - start_time
+            print("Final Output Formatted.xlsx saving")
+            exp = pd.concat([exp1, exp2], ignore_index=True)
+
+            max_len = max(len(company_name), len(filtered_agents_output_list), len(exp.iloc[:, 0].tolist()))
+
+            padded_company_name = pad_list([company_name], max_len)
+            padded_subsidaries = pad_list(filtered_agents_output_list, max_len)
+            padded_domains = pad_list(exp.iloc[:, 0].tolist(), max_len)
+            padded_source = pad_list(exp.iloc[:, 1].tolist(), max_len)
+            padded_reason = pad_list(exp.iloc[:, 2].tolist(), max_len)
+
+            final_output_df = pd.DataFrame()
+            # Create new columns for the required structure
+            final_output_df["Company"] = padded_company_name
+            final_output_df["Subsidiaries/Brands"] = padded_subsidaries
+            final_output_df["Domains"] = padded_domains
+            final_output_df["Source"] = padded_source
+            final_output_df["Reason"] = padded_reason
+
+            final_output_df.to_excel(os.path.join(final_results_directory,"Final_Output_Formatted.xlsx"), index=False, header=True)
+            print("Final Output Formatted.xlsx saved")
+
 
             common_values = set(gtd).intersection(valid_domains)
             common_values = list(common_values)
@@ -199,6 +224,8 @@ def awgtd(df,link_grabber_data,company_name,company_website,start_time):
             })
 
             export_df.to_excel(os.path.join(final_results_directory, 'company_accuracy.xlsx'), index=False, header=True)
+
+            endtime = datetime.now() - start_time
 
             with open(log_file_paths['log'], 'a') as f:
                 f.write("\n\n")
