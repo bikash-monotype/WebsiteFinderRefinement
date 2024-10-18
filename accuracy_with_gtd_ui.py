@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from helpers import create_result_directory, extract_domain_name, pad_list, social_media_domain_main_part, extract_main_part
+from helpers import create_result_directory, is_subdomain, extract_domain_name, pad_list, social_media_domain_main_part, extract_main_part
 import os
 from company_websites_validation import validate_agentsOutput_domains, validate_working_domains, validate_linkgrabber_domains
 from company_websites import process_single_website
@@ -41,7 +41,7 @@ if uploaded_file is not None and link_grabber_file is not None and company_name 
         gtd = [value for value in gtd if not pd.isna(value)]
         agentsOutput = [value for value in agentsOutput if not pd.isna(value) and isinstance(value, str) and value != "." and extract_main_part(value) not in social_media_domain_main_part]
 
-        gtd = [extract_domain_name(url) for url in gtd]
+        gtd = [extract_domain_name(url) for url in gtd if not is_subdomain(url)]
         gtd = set(gtd)
         gtd = list(gtd)
 

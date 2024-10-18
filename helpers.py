@@ -277,6 +277,12 @@ def extract_year(copyright_text):
     else:
         return None
 
+def is_subdomain(url):
+    if not url.startswith('http://') and not url.startswith('https://'):
+        url = f'https://{url}'
+    extracted = tldextract.extract(url)
+    return extracted.subdomain != "" and extracted.subdomain != "www"
+
 def get_links(url, log_file_path):
     fin = set()
 
