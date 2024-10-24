@@ -407,7 +407,7 @@ def validate_domains_that_are_considered_correct_by_llm_in_google_search(url, ma
             f"""
             **Task Objective:**
             Determine whether the specified domain is **formally associated** with the company owning the main website by being part of its subsidiaries, brands, or formal partnerships involving **ownership stakes or equity relationships**.
-            Exclude any instances where the domain appears as a third-party tool, service, advertisement, or reporting platform, or is associated through license agreements or non-equity partnerships, without formal ownership or stake-based association.
+            Exclude any instances where the domain appears as a third-party tool, service, advertisement, or reporting platform, or is associated through license agreements, financial services, or non-equity partnerships, without formal ownership or stake-based association.
 
             **Domain:** {url}  
             **Main Company:** {main_company}  
@@ -448,6 +448,7 @@ def validate_domains_that_are_considered_correct_by_llm_in_google_search(url, ma
             - **Advertisement platform**
             - **Reporting platform**
             - **Tool**
+            - **Establishment of deposit accounts, debit card issuance, or other financial services under license agreements**
             - **Without ownership, branding, or equity-based partnerships with the company.**
 
             #### 6. **Verification of Explicit Ownership Indicators:**
