@@ -281,7 +281,7 @@ def validate_single_correct_domains(log_file_paths, main_company, main_company_d
         if results[1] == 'Yes':
             final_validation = {}
 
-            if domain not in search_results_links:
+            if extract_domain_name(domain) not in search_results_links:
                 final_validation['is_company_domain'] = 'No'
                 final_validation['reason'] = 'Domain not found in search results but only subdomain found.'
                 final_validation['ownership_not_clear'] = 'Yes'
@@ -407,6 +407,9 @@ def validate_domains_that_are_considered_correct_by_llm_in_google_search(url, ma
             f"""
             **Task Objective:**
             Determine whether the specified domain is **formally associated** with the company owning the main website by being part of its subsidiaries, brands, or formal partnerships involving **ownership stakes or equity relationships**.
+            
+            **Use only the provided content to reach a conclusion. No other information should be used.** Do not use general knowledge, make assumptions, or rely on any information not explicitly given in the provided content.
+            
             Exclude any instances where the domain appears as a third-party tool, service, advertisement, or reporting platform, or is associated through license agreements, financial services, or non-equity partnerships, without formal ownership or stake-based association.
 
             **Domain:** {url}  
@@ -566,14 +569,14 @@ def validate_single_correct_linkgrabber_domains(log_file_paths, main_company, co
                 ### **Task Breakdown:**
 
                 1. **Presence Verification:**
-                - Search the provided website (`{main_domain}`) to check if the specified domain (`{domain}`) appears anywhere on the site.
-                - **Email Address Cross-Verification:** If the email address of the domain (`{domain}`) appears in contact information (e.g., contact@{domain}), prioritize this as a potential indicator of ownership or formal association with the company.
+                - Search the provided website ({main_domain}) to check if the specified domain ({domain}) appears anywhere on the site. Only presence of subdomain of ({domain}) is not enough to consider it as a valid domain.
+                - **Email Address Cross-Verification:** If the email address of the domain ({domain}) appears in contact information (e.g., contact@{domain}), prioritize this as a potential indicator of ownership or formal association with the company.
 
                 2. **Ownership and Association Analysis of {main_company}:**
                 - **Confirm if the domain is associated with the company** in one of the following ways:
                     - **Subsidiaries:** Verify if the domain belongs to a subsidiary of the company. Look for corporate ownership listings or related documentation.
                     - **Brands:** Identify if the domain represents a brand of the company. This includes domains for products, services, or divisions under the company’s umbrella.
-                    - **Partnerships with Stakes:** Determine if the domain is part of a formal partnership where the company holds stakes or equity-based investments.
+                    - **Partnerships with Stakes:** Determine if the domain is part of a formal partnership where the company holds stakes or equity-based investments. Only consider partnerships involving ownership stakes or equity relationships.
                     - **Acquisitions:** Check if the domain was acquired or merged into the company.
                 - **Ownership Indicators:** Look for explicit mentions of ownership, such as:
                     - "operated by"
@@ -601,6 +604,7 @@ def validate_single_correct_linkgrabber_domains(log_file_paths, main_company, co
                     - **Advertisement platform**
                     - **Reporting platform**
                     - **Tool**
+                    - **Establishment of deposit accounts, debit card issuance, or other financial services under license agreements**
                     - **Without ownership, branding, or equity-based partnerships with the company.**
                 - **Exclude Mentions Under License Agreements:**
                     - **Mentions such as "established by", "issued by", or "in partnership with" under a license agreement do not indicate formal ownership.** Unless the company has a direct ownership stake or the domain is a subsidiary or brand, it should be excluded.
