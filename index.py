@@ -12,7 +12,9 @@ from company_structures_validation import validate_company_structure
 from company_websites import get_official_websites, process_website_and_get_copyrights, process_copyright_research, process_domain_research, process_link_grabber
 import dill
 import numpy as np
-from company_websites_validation import validate_domains
+from company_websites_validation import validate_agentsOutput_domains, validate_linkgrabber_domains
+import json
+from accuracy_with_gtd import awgtd
 
 load_dotenv()
 
@@ -26,13 +28,18 @@ st.header("Company Search")
 with st.form(key="company_search"):
     cik_number = st.text_input("CIK Number")
     company_name = st.text_input("Company Name")
-    
+
     submit_button = st.form_submit_button(label="Submit")
 
 if submit_button:
     try:
-        response = requests.get(f"{base_url}{api_version}catalyst/sec/company?search={company_name}&cik_number={cik_number}&page=1&page_size=10")
-        
+        if cik_number:
+            url = f"{base_url}{api_version}catalyst/sec/company?search={company_name}&cik_number={cik_number}&page=1&page_size=100"
+        else:
+            url = f"{base_url}{api_version}catalyst/sec/company?search={company_name}&page=1&page_size=100"
+
+        response = requests.get(url)
+
         if response.status_code == 200:
             st.success("Companies fetched successfully!")
             st.write("API Response:", response.json())
@@ -46,22 +53,30 @@ st.header("Company Details Search")
 with st.form(key="company_details_search"):
     sec_company_id = st.text_input("Company Id")
     company_name = st.text_input("Company Name")
-    
+    company_website = st.text_input("Company Website")
+    uploaded_file = st.file_uploader("Upload GTD", type=["xlsx"])
+
     submit_button = st.form_submit_button(label="Submit")
 
 if submit_button:
     try:
         start_time = datetime.now()
-
         folder_name = datetime.now().strftime("%Y%m%d%H%M%S")
         result_directory = f"{company_name}_{folder_name}"
         final_results_directory = f"final_results/{result_directory}"
         log_file_paths = create_result_directory(result_directory, 'final_results')
 
+        if uploaded_file is not None:
+            st.write(f"File '{uploaded_file.name}' has been uploaded successfully.")
+            gtd = pd.read_excel(uploaded_file)
+        else:
+            gtd = []
+
         whole_process_prompt_tokens = 0
         whole_process_completion_tokens = 0
         whole_process_llm_costs = 0
         whole_process_serper_credits = 0
+        has_sec_urls = True
 
         st.markdown(f"""
             <style>
@@ -83,11 +98,13 @@ if submit_button:
         else:
             try:
                 data = response.json()
-                if data['data']:
-                    st.success("Company details fetched successfully!")
-                    urls = data['data']
+
+                if data['code'] == 200:
+                    if data['data']:
+                        st.success("Company details fetched successfully!")
+                        urls = data['data']['reports']
                 else:
-                    st.error("Unexpected response format: 'data' key not found")
+                    st.error("Unexpected response format: 'reports' key not found")
                     urls = []
             except ValueError as e:
                 urls = []
@@ -97,86 +114,38 @@ if submit_button:
             f.write(f"SEC API Response:\n")
             f.write(f"{str(urls)}\n")
 
-        # st.write("###### No url found for the given company")
+        urls = [url for url in urls if '/search/' not in url]
 
-        st.write("###### Fetching links for finding company structures")
+        if len(urls) == 0:
+            has_sec_urls = False
+            st.write("###### Fetching links for finding company structures")
 
-        all_links = get_links_for_company_structures_for_private_company(company_name, log_file_paths['log'])
+            all_links = get_links_for_company_structures_for_private_company(company_name, log_file_paths['log'])
 
-        total_cost_USD = calculate_openai_costs(all_links['llm_usage']['prompt_tokens'], all_links['llm_usage']['completion_tokens'])
+            total_cost_USD = calculate_openai_costs(all_links['llm_usage']['prompt_tokens'], all_links['llm_usage']['completion_tokens'])
 
-        whole_process_prompt_tokens += all_links['llm_usage']['prompt_tokens']
-        whole_process_completion_tokens += all_links['llm_usage']['completion_tokens']
-        whole_process_llm_costs += total_cost_USD
-        whole_process_serper_credits += all_links['serper_credits']
+            whole_process_prompt_tokens += all_links['llm_usage']['prompt_tokens']
+            whole_process_completion_tokens += all_links['llm_usage']['completion_tokens']
+            whole_process_llm_costs += total_cost_USD
+            whole_process_serper_credits += all_links['serper_credits']
 
-        with open(log_file_paths['llm'], 'a') as f:
-            f.write(f"\n\n")
-            f.write(f"Finding links for subsidiaries for private subsidiaries:\n")
-            f.write(f"Total Prompt Tokens: {all_links['llm_usage']['prompt_tokens']}\n")
-            f.write(f"Total Completion Tokens: {all_links['llm_usage']['completion_tokens']}\n")
-            f.write(f"Total Cost in USD: {total_cost_USD}\n")
+            with open(log_file_paths['llm'], 'a') as f:
+                f.write(f"\n\n")
+                f.write(f"Finding links for subsidiaries for private subsidiaries:\n")
+                f.write(f"Total Prompt Tokens: {all_links['llm_usage']['prompt_tokens']}\n")
+                f.write(f"Total Completion Tokens: {all_links['llm_usage']['completion_tokens']}\n")
+                f.write(f"Total Cost in USD: {total_cost_USD}\n")
 
-        with open(log_file_paths['serper'], 'a') as f:
-            f.write("\n\n")
-            f.write(f"Finding links for subsidiaries for private subsidiaries:\n")
-            f.write(f"Total Credits: {all_links['serper_credits']}\n")
-            f.write(f"Total Cost in USD: {get_serper_costs(all_links['serper_credits'])}\n")
+            with open(log_file_paths['serper'], 'a') as f:
+                f.write("\n\n")
+                f.write(f"Finding links for subsidiaries for private subsidiaries:\n")
+                f.write(f"Total Credits: {all_links['serper_credits']}\n")
+                f.write(f"Total Cost in USD: {get_serper_costs(all_links['serper_credits'])}\n")
 
-        if all_links['links'] is not None:
-            urls.extend(all_links['links'])
-           
+            if all_links['links'] is not None:
+                urls.extend(all_links['links'])
+
         urls = list(set(urls))
-
-        with open(log_file_paths['links'], 'a') as f:
-            f.write(f"\n\n")
-            f.write(f"All Urls Response:\n")
-            f.write(f"{str(urls)}\n")
-
-        # if len(urls) == 0:
-        #     st.write("###### No url found for the given company")
-
-        #     st.write("###### Fetching links for finding company structures for private company")
-
-        #     all_links = get_links_for_company_structures_for_private_company(company_name, log_file_paths['log'])
-
-        #     total_cost_USD = calculate_openai_costs(all_links['llm_usage']['prompt_tokens'], all_links['llm_usage']['completion_tokens'])
-
-        #     whole_process_prompt_tokens += all_links['llm_usage']['prompt_tokens']
-        #     whole_process_completion_tokens += all_links['llm_usage']['completion_tokens']
-        #     whole_process_llm_costs += total_cost_USD
-        #     whole_process_serper_credits += all_links['serper_credits']
-
-        #     with open(log_file_paths['llm'], 'a') as f:
-        #         f.write(f"\n\n")
-        #         f.write(f"Finding links for subsidiaries for private subsidiaries:\n")
-        #         f.write(f"Total Prompt Tokens: {all_links['llm_usage']['prompt_tokens']}\n")
-        #         f.write(f"Total Completion Tokens: {all_links['llm_usage']['completion_tokens']}\n")
-        #         f.write(f"Total Cost in USD: {total_cost_USD}\n")
-
-        #     with open(log_file_paths['serper'], 'a') as f:
-        #         f.write("\n\n")
-        #         f.write(f"Finding links for subsidiaries for private subsidiaries:\n")
-        #         f.write(f"Total Credits: {all_links['serper_credits']}\n")
-        #         f.write(f"Total Cost in USD: {get_serper_costs(all_links['serper_credits'])}\n")
-
-        #     urls = all_links['links']
-        # else:
-        #     print('Running else')
-            # progress_bar = st.progress(0)
-            # total_urls = len(urls)
-            # progress_step = 1 / total_urls
-
-            # fetch_links_for_company_structures_with_log = partial(get_links_for_company_structures, company_name, log_file_paths)
-
-            # serialized_function = dill.dumps(fetch_links_for_company_structures_with_log)
-
-            # with multiprocessing.Pool(processes=10) as pool:
-            #     results = []
-            #     for i, result in enumerate(pool.imap(partial(process_worker_function, serialized_function), urls), 1):
-            #         results.append(result)
-            #         progress_bar.progress(min((i + 1) * progress_step, 1.0))
-            # dont forget to add the results to the links and llm cost and serper credits
 
         with open(log_file_paths['links'], 'a') as f:
             f.write(f"\n\n")
@@ -190,9 +159,9 @@ if submit_button:
         progress_step = 1 / total_urls
 
         fetch_company_structures_with_log = partial(get_company_structures, company_name, log_file_paths)
-    
+
         serialized_function = dill.dumps(fetch_company_structures_with_log)
-    
+
         with multiprocessing.Pool(processes=10) as pool:
             results = []
             for i, result in enumerate(pool.imap(partial(process_worker_function, serialized_function), urls), 1):
@@ -233,65 +202,72 @@ if submit_button:
 
         export_df.to_excel(os.path.join(final_results_directory, 'company_structures.xlsx'), index=False, header=True)
 
-        st.write("###### Validating the subsidiaries")
+        st.write('Company structures fetched successfully!')
 
-        export_df = pd.read_excel(os.path.join(final_results_directory, 'company_structures.xlsx'))
+        if has_sec_urls is False:
+            st.write("###### Validating the subsidiaries")
 
-        company_structure_set = export_df['Company Structure'].tolist()
-        
-        valid_subsidiaries = validate_company_structure(company_structure_set, company_name, log_file_paths)
+            export_df = pd.read_excel(os.path.join(final_results_directory, 'company_structures.xlsx'))
 
-        export_df = pd.DataFrame({
-            'AgentsOutput': valid_subsidiaries['agentsOutputList'],
-            'ValidAgentsOutput': valid_subsidiaries['correct_agentsOutputList'],
-            'ValidAgentsReference': valid_subsidiaries['correct_agentsOutputListReference'],
-            'ErrorAgentsOutput': valid_subsidiaries['error_agentsOutputList'],
-            'ErrorAgentsReference': valid_subsidiaries['error_agentsOutputListReference']
-        })
+            company_structure_set = export_df['Company Structure'].tolist()
 
-        export_df['Accuracy'] = valid_subsidiaries['accuracy']
-        export_df['Error'] = valid_subsidiaries['error']
+            valid_subsidiaries = validate_company_structure(company_structure_set, company_name, log_file_paths)
 
-        export_df.to_excel(os.path.join(final_results_directory, company_name.replace('/', '-') + '.xlsx'), index=False, header=True)
+            export_df = pd.DataFrame({
+                'AgentsOutput': valid_subsidiaries['agentsOutputList'],
+                'ValidAgentsOutput': valid_subsidiaries['correct_agentsOutputList'],
+                'ValidAgentsReference': valid_subsidiaries['correct_agentsOutputListReference'],
+                'ErrorAgentsOutput': valid_subsidiaries['error_agentsOutputList'],
+                'ErrorAgentsReference': valid_subsidiaries['error_agentsOutputListReference']
+            })
 
-        filtered_agents_output_list = {item for item in valid_subsidiaries['correct_agentsOutputList'] if item is not None}
-        filtered_agents_output_list.add(company_name)
+            export_df['Accuracy'] = valid_subsidiaries['accuracy']
+            export_df['Error'] = valid_subsidiaries['error']
 
-        filtered_agents_output_list = list(filtered_agents_output_list)
+            export_df.to_excel(os.path.join(final_results_directory, company_name.replace('/', '-') + '.xlsx'), index=False, header=True)
 
-        st.markdown(f"<span style='color: green;'>####### {len(filtered_agents_output_list)} valid subsidiaries found.</span>", unsafe_allow_html=True)
+            filtered_agents_output_list = {item for item in valid_subsidiaries['correct_agentsOutputList'] if item is not None}
+            filtered_agents_output_list.add(company_name)
 
-        total_cost_USD = calculate_openai_costs(valid_subsidiaries['llm_usage']['prompt_tokens'], valid_subsidiaries['llm_usage']['completion_tokens'])
+            filtered_agents_output_list = list(filtered_agents_output_list)
 
-        with open(log_file_paths['llm'], 'a') as f:
-            f.write(f"\n\n")
-            f.write(f"Validating subsidiaries:\n")
-            f.write(f"Total Prompt Tokens: {valid_subsidiaries['llm_usage']['prompt_tokens']}\n")
-            f.write(f"Total Completion Tokens: {valid_subsidiaries['llm_usage']['completion_tokens']}\n")
-            f.write(f"Total Cost in USD: {total_cost_USD}\n")
+            st.markdown(f"<span style='color: green;'>####### {len(filtered_agents_output_list)} valid subsidiaries found.</span>", unsafe_allow_html=True)
 
-        with open(log_file_paths['serper'], 'a') as f:
-            f.write("\n\n")
-            f.write(f"Validating subsidiaries:\n")
-            f.write(f"Total Credits: {valid_subsidiaries['serper_credits']}\n")
-            f.write(f"Total Cost in USD: {get_serper_costs(valid_subsidiaries['serper_credits'])}\n")
+            total_cost_USD = calculate_openai_costs(valid_subsidiaries['llm_usage']['prompt_tokens'], valid_subsidiaries['llm_usage']['completion_tokens'])
 
-        whole_process_prompt_tokens += valid_subsidiaries['llm_usage']['prompt_tokens']
-        whole_process_completion_tokens += valid_subsidiaries['llm_usage']['completion_tokens']
-        whole_process_llm_costs += total_cost_USD
+            with open(log_file_paths['llm'], 'a') as f:
+                f.write(f"\n\n")
+                f.write(f"Validating subsidiaries:\n")
+                f.write(f"Total Prompt Tokens: {valid_subsidiaries['llm_usage']['prompt_tokens']}\n")
+                f.write(f"Total Completion Tokens: {valid_subsidiaries['llm_usage']['completion_tokens']}\n")
+                f.write(f"Total Cost in USD: {total_cost_USD}\n")
 
-        whole_process_serper_credits += valid_subsidiaries['serper_credits']
+            with open(log_file_paths['serper'], 'a') as f:
+                f.write("\n\n")
+                f.write(f"Validating subsidiaries:\n")
+                f.write(f"Total Credits: {valid_subsidiaries['serper_credits']}\n")
+                f.write(f"Total Cost in USD: {get_serper_costs(valid_subsidiaries['serper_credits'])}\n")
 
-        export_df = pd.DataFrame(filtered_agents_output_list, columns=['Company Name'])
+            whole_process_prompt_tokens += valid_subsidiaries['llm_usage']['prompt_tokens']
+            whole_process_completion_tokens += valid_subsidiaries['llm_usage']['completion_tokens']
+            whole_process_llm_costs += total_cost_USD
 
-        export_df.to_excel(os.path.join(final_results_directory, 'filtered_valid_subsidiaries_output_list' + '.xlsx'), index=False, header=True)
+            whole_process_serper_credits += valid_subsidiaries['serper_credits']
 
-        export_df = pd.read_excel(os.path.join(final_results_directory, 'filtered_valid_subsidiaries_output_list' + '.xlsx'))
+            export_df = pd.DataFrame(filtered_agents_output_list, columns=['Company Name'])
 
-        filtered_agents_output_list = export_df['Company Name'].tolist()
-    
+            export_df.to_excel(os.path.join(final_results_directory, 'filtered_valid_subsidiaries_output_list' + '.xlsx'), index=False, header=True)
+
+            export_df = pd.read_excel(os.path.join(final_results_directory, 'filtered_valid_subsidiaries_output_list' + '.xlsx'))
+
+            filtered_agents_output_list = export_df['Company Name'].tolist()
+        else:
+            export_df = pd.read_excel(os.path.join(final_results_directory, 'company_structures' + '.xlsx'))
+
+            filtered_agents_output_list = export_df['Company Structure'].tolist()
+
         st.write("###### Finding official websites for the subsidiaries")
-        websites = get_official_websites(filtered_agents_output_list, company_name, log_file_paths)
+        websites = get_official_websites(filtered_agents_output_list, company_name, company_website, log_file_paths)
         total_cost_USD = calculate_openai_costs(websites['llm_usage']['prompt_tokens'], websites['llm_usage']['completion_tokens'])
 
         with open(log_file_paths['llm'], 'a') as f:
@@ -322,12 +298,7 @@ if submit_button:
 
         st.write("###### Find copyright for the subsidiaries")
 
-        unique_urls = set()
-
-        for entry in websites_research_data:
-            unique_urls.add(get_main_domain(entry.rstrip('/')))
-
-        copyrights = process_website_and_get_copyrights(unique_urls, log_file_paths)
+        copyrights = process_website_and_get_copyrights([get_main_domain(company_website.rstrip('/'))], log_file_paths)
 
         total_cost_USD = copyrights['llm_usage']['total_cost_USD']
 
@@ -345,7 +316,7 @@ if submit_button:
         file_path = os.path.join(final_results_directory, 'website_research_agent.xlsx')
         export_df = pd.read_excel(file_path)
 
-        export_df['Copyright'] = export_df['Website URL'].map(copyrights['copyrights'])
+        export_df.loc[0, 'Copyright'] = next(iter(copyrights['copyrights'].values()))
         export_df.to_excel(file_path, index=False, header=True)
 
         st.write("###### Find websites using copyright")
@@ -354,9 +325,8 @@ if submit_button:
 
         data = export_df[['Company Name', 'Copyright']]
         data_cleaned = data.replace('N/A', np.nan).dropna(subset=['Copyright'])
-        unique_copyrights = data_cleaned.drop_duplicates(subset=['Copyright'])
 
-        copyright_research = process_copyright_research(unique_copyrights, log_file_paths)
+        copyright_research = process_copyright_research(data_cleaned, log_file_paths)
         with open(log_file_paths['serper'], 'a') as f:
             f.write("\n\n")
             f.write(f"Finding websites using copyright search:\n")
@@ -395,12 +365,18 @@ if submit_button:
         for url in unique_urls:
             websites_results.add(extract_domain_name(url))
 
+        grabbed_link_domain_lists = set()
+
         st.write("###### Start Link Grabber")
 
         link_grabber_results = process_link_grabber(unique_urls, log_file_paths)
 
-        df = pd.DataFrame(link_grabber_results, columns=['Website URL'])
-        df.to_excel(os.path.join(final_results_directory, 'link_grabber_agent' + '.xlsx'), index=False, header=True)
+        for data in link_grabber_results:
+            for main_domain, domains in data.items():
+                grabbed_link_domain_lists.update(domains)
+
+        with open(os.path.join(final_results_directory, 'link_grabber_agent.json'), 'w') as json_file:
+            json.dump(link_grabber_results, json_file, indent=4)
 
         df = pd.read_excel(os.path.join(final_results_directory, 'copyright_research_agent' + '.xlsx'))
         copyright_results = set(df['Website URL'].tolist())
@@ -408,75 +384,26 @@ if submit_button:
         df = pd.read_excel(os.path.join(final_results_directory, 'domain_search_agent' + '.xlsx'))
         domain_research_results = set(df['Website URL'].tolist())
 
-        df = pd.read_excel(os.path.join(final_results_directory, 'link_grabber_agent' + '.xlsx'))
-        link_grabber_results = set(df['Website URL'].tolist())
-
-        combined_final_results = websites_results.union(copyright_results).union(domain_research_results).union(link_grabber_results)
+        combined_final_results = websites_results.union(copyright_results).union(domain_research_results).union(grabbed_link_domain_lists)
 
         df = pd.DataFrame(combined_final_results, columns=['Website URL'])
         df.to_excel(os.path.join(final_results_directory, 'combined_final_results' + '.xlsx'), index=False, header=True)
 
-        st.write('###### Start validation of the domains')
-        st.write('###### Remove unreachable, on sale and redirected domains')
+        validation_df = pd.concat([gtd, df], axis=1)
+        validation_df.columns = ["GTD", "AgentsOutput"]
+        validation_input_path = f"./validation_input/{company_name}_validation.xlsx"
+        validation_df.to_excel(validation_input_path, index=False)
 
-        export_df = pd.read_excel(os.path.join(final_results_directory, 'filtered_valid_subsidiaries_output_list' + '.xlsx'))
+        with open(os.path.join(final_results_directory, 'link_grabber_agent.json'), 'r') as json_file:
+            link_grabber_results = json.load(json_file)
 
-        filtered_agents_output_list = export_df['Company Name'].tolist()
+        st.write("############### Completing the agentic run #########################")
+        st.write("############### Starting the validation #########################")
 
-        df = pd.read_excel(os.path.join(final_results_directory, 'combined_final_results' + '.xlsx'))
 
-        combined_final_results = df['Website URL'].tolist()
 
-        response = validate_domains(combined_final_results, company_name, log_file_paths)
+        awgtd(validation_df,link_grabber_results,company_name,company_website,start_time,filtered_agents_output_list)
 
-        export_df = pd.DataFrame({
-            'Domains': response['final_invalid_non_working_domains'],
-        })
-
-        export_df.to_excel(os.path.join(final_results_directory, 'final_invalid_non_working_domains.xlsx'), index=False, header=True)
-
-        max_length = max(len(filtered_agents_output_list), len(response['final_valid_working_domains']))
-
-        export_df = pd.DataFrame({
-            'Company Name': pad_list([company_name], max_length),
-            'Subsidiaries': pad_list(filtered_agents_output_list, max_length),
-            'Domains': pad_list(response['final_valid_working_domains'], max_length),
-        })
-
-        export_df.to_excel(os.path.join(final_results_directory, 'final_output.xlsx'), index=False, header=True)
-
-        with open(log_file_paths['serper'], 'a') as f:
-            f.write("\n\n")
-            f.write(f"Validation domains.\n")
-            f.write(f"Total Credits: {response['total_serper_credits']}\n")
-            f.write(f"Total Cost in USD: {get_serper_costs(response['total_serper_credits'])}\n")
-
-        with open(log_file_paths['llm'], 'a') as f:
-            f.write("\n\n")
-            f.write(f"Validating domains:\n")
-            f.write(f"Total Prompt Tokens: {response['total_prompt_tokens']}\n")
-            f.write(f"Total Completion Tokens: {response['total_completion_tokens']}\n")
-            f.write(f"Total Cost in USD: {response['total_cost_USD']}\n")
-
-        whole_process_prompt_tokens += response['total_prompt_tokens']
-        whole_process_completion_tokens += response['total_completion_tokens']
-        whole_process_llm_costs += response['total_cost_USD']
-        whole_process_serper_credits += response['total_serper_credits']
-
-        st.write(f"Total Prompt Tokens: {whole_process_prompt_tokens}")
-        st.write(f"Total Completion Tokens: {whole_process_completion_tokens}")
-        st.write(f"Total Cost in USD: {whole_process_llm_costs}")
-        st.write(f"Total Serper Credits: {whole_process_serper_credits}")
-
-        endtime = datetime.now() - start_time
-
-        with open(log_file_paths['log'], 'a') as f:
-            f.write("\n\n")
-            f.write(f"Time Taken To Complete the whole process: {endtime}\n")
-            f.write(f"Total Prompt Tokens: {whole_process_prompt_tokens}\n")
-            f.write(f"Total Completion Tokens: {whole_process_completion_tokens}\n")
-            f.write(f"Total Cost in USD: {whole_process_llm_costs}\n")
-            f.write(f"Total Serper Credits: {whole_process_serper_credits}\n")
-            f.write(f"Total Cost in USD for Serper Credits: {get_serper_costs(whole_process_serper_credits)}\n")
     except Exception as e:
         st.error(f"An error occurred: {e}")
+

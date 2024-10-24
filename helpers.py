@@ -31,7 +31,7 @@ social_media_domain_main_part = [
     'threads', 'linkedin', 'pinterest', 'youtube', 'onetrust', 'amazon', 'reddit', 'wordpress', 'adobe',
     'tiktok', 'snapchat', 'whatsapp', 'quora', 'google', 'github', 'apple', 'vimeo', 'youtu', 'cloudflare', 'goo', 'mozilla', 'maps',
     'example', 'oauth', 'sec', 'researchgate', 'gov', 'microsoft', 'w3', 'wikipedia', 'mozilla', 'qq', 'you', 'jquery', 'shopifycdn', 'shopify', 'fontawesome', 'jsdelivr',
-    'myworkdayjobs', 'applytojob', 'device', 'site', 'q4cdn', 'softonic', 'c212', 'gstatic', 'x', 'unpkg', 'hcaptcha', 'yahoo', 'myshopify', 'amazonaws', 'nasa', 'azurewebsites', 'gcs-web', 'ow', 'cloudfront', 'soundcloud', 'onelink'
+    'myworkdayjobs', 'applytojob', 'device', 'site', 'q4cdn', 'softonic', 'c212', 'gstatic', 'x', 'unpkg', 'hcaptcha', 'yahoo', 'myshopify', 'amazonaws', 'nasa', 'azurewebsites', 'gcs-web', 'ow', 'cloudfront', 'soundcloud', 'onelink', 'bit'
 ]
 
 llm = AzureChatOpenAI(
@@ -64,6 +64,13 @@ def calculate_openai_costs(input_tokens, output_tokens):
     input_cost = (input_tokens / 1000) * float(os.getenv('AZURE_OPENAI_MODEL_INPUT_TOKENS_COST'))
     output_cost = (output_tokens / 1000) * float(os.getenv('AZURE_OPENAI_MODEL_OUTPUT_TOKENS_COST'))
     return (input_cost + output_cost)
+
+def get_netloc(url):
+    parsed_url = urllib.parse.urlparse(url)
+    netloc = parsed_url.netloc
+    if netloc.startswith('www.'):
+        netloc = netloc.replace('www.', '')
+    return netloc
 
 def get_main_domain(url):
     parsed_url = urllib.parse.urlparse(url)
@@ -171,17 +178,23 @@ def tokenize_text(text):
 
 def translate_text(text):
     sample_json = {
-        'converted_text': 'Converted'
+        'converted_text': 'Converted',
+        'is_translated': 'Yes/No'
     }
     
     template = """
-        You are a language model. 
-        Convert the given google search string according to it's country language.
+        You are a language model.
+        Convert the given Google search string according to its country's language.
 
         Text: {input_text}
 
         Sample Output Format:
         {sample_json}
+
+        Important Notes:
+        1. Identify the country from the provided domain in the search string.
+        2. If the country is identified, convert the search string to the corresponding country's language and set the value of is_translated to value 'Yes'.
+        3. If unable to identify the country from the domain, return the original search string without any modifications and set the value of is_translated to value 'No'.
 
         Important note: Please provide the output in the JSON format as shown above.
     """
@@ -202,6 +215,7 @@ def translate_text(text):
 
     return {
         'converted_text': result['converted_text'],
+        'is_translated': result['is_translated'],
         'prompt_tokens': prompt_tokens,
         'completion_tokens': completion_tokens,
     }
@@ -263,16 +277,46 @@ def extract_year(copyright_text):
     else:
         return None
 
+def is_subdomain(url):
+    if not url.startswith('http://') and not url.startswith('https://'):
+        url = f'https://{url}'
+    extracted = tldextract.extract(url)
+    return extracted.subdomain != "" and extracted.subdomain != "www"
+
 def get_links(url, log_file_path):
     fin = set()
+
+    if not url.startswith('http://') and not url.startswith('https://'):
+        url = f'https://{url}'
+
     results = get_all_links(url, log_file_path)
 
     if isinstance(results, list):
         for item in results:
             if validators.url(item) and not is_social_media_link(item):
-                fin.add(item)
+                fin.add(extract_domain_name(item))
 
-    return fin
+    return {
+        extract_domain_name(url): list(fin)
+    }
+
+def is_reachable(url):
+    if not url.startswith('http://') and not url.startswith('https://'):
+        url = f'https://{url}'
+
+    with sync_playwright() as p:
+        try:
+            browser = p.chromium.launch(headless=False, args=['--disable-http2'])
+            page = browser.new_page()
+            page.goto(url, timeout=100000)
+
+            return True
+        except Exception as e:
+            print(e)
+            return False
+        finally:
+            if page is not None:
+                page.close()
 
 def get_all_links(url, log_file_path):
     print(url)
@@ -284,10 +328,10 @@ def get_all_links(url, log_file_path):
             try:
                 browser = p.chromium.launch(headless=False, args=['--disable-http2'])
                 page = browser.new_page()
-                page.goto(url, timeout=120000)
+                page.goto(url, timeout=80000)
                 
                 page.wait_for_load_state('load')
-                time.sleep(10)
+                time.sleep(8)
 
                 links = page.eval_on_selector_all("[href]", "elements => elements.map(el => el.href)")
                 break

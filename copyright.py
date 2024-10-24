@@ -18,11 +18,17 @@ graph_config = get_scrapegraph_config()
 def get_copyright(url, log_file_path):
     try :
         prompt = """
-            From the footer area of the provided webpage, extract the copyright text. 
+            From the footer area of the provided webpage, extract the copyright text if it exists.
+
             Ensure the following:
             1. Do not include 'All rights reserved' in the output.
-            2. If the copyright text is not found in the webpage, return {'copyright': None}.
-            3. The output should be in the format: {'copyright': 'Copyright © YEAR Company.'}
+            2. If no copyright text is found on the webpage, return {'copyright': None}.
+            3. Only extract the copyright text if it clearly indicates ownership, in the format similar to:
+            - "© YEAR Company Name."
+            - If variations such as "issued by" or "licensed to" are found instead, treat them as **not valid** for ownership, and return {'copyright': None}.
+            4. The output format must be: {'copyright': 'Copyright © YEAR Company.'} if the correct copyright is found.
+
+            Important: Do not assume the presence of copyright text. Ensure it actually exists on the webpage.
         """
         smart_scraper_graph = SmartScraperGraph(
             prompt=prompt,
@@ -39,8 +45,8 @@ def get_copyright(url, log_file_path):
         }
     except Exception as e:
         with open(log_file_path['log'], 'a') as f:
-            f.write(f"Exception when getting copyright using scrapegraph AI: {e}, Url is {url}")
-        print(f"Exception when getting copyright using scrapegraph AI: {e}")
+            f.write(f"Exception when getting copyright from {url} using scrapegraph AI: {e}")
+        print(f"Exception when getting copyright from {url} using scrapegraph AI: {e}")
         return {
             'result': { 'copyright': None },
             'exec_info': None

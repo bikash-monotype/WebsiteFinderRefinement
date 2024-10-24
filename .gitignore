@@ -9,5 +9,7 @@ validation_input/
 private/
 Accuracy.xlsx
 .idea/
-comparison/
 fireworks-venv/
+testing/
+gtd/
+.DS_Store

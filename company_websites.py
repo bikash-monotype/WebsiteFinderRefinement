@@ -10,7 +10,7 @@ from functools import partial
 from helpers import extract_domain_name
 from copyright import get_copyright
 import re
-from helpers import extract_year, extract_main_part, get_links, process_worker_function, tokenize_text
+from helpers import extract_year, extract_main_part, get_links, process_worker_function, tokenize_text, extract_domain_name
 import dill
 from dotenv import load_dotenv
 import time
@@ -268,8 +268,6 @@ def process_link_grabber(website_urls, log_file_paths):
     progress_bar = st.progress(0)
     progress_step = 1 / total_urls
 
-    link_grabber_results = set()
-
     get_links_with_log_file = partial(get_links, log_file_path=log_file_paths['log'])
 
     serialized_function = dill.dumps(get_links_with_log_file)
@@ -280,11 +278,7 @@ def process_link_grabber(website_urls, log_file_paths):
             results.append(result)
             progress_bar.progress((i + 1) * progress_step)
 
-    for result in results:
-        for link in list(result):
-            link_grabber_results.add(extract_domain_name(link))
-
-    return link_grabber_results
+    return results
 
 def process_single_copyright_research(row, log_file_paths):
     company_name = row['Company Name']
@@ -383,7 +377,7 @@ def process_copyright_research(unique_copyrights, log_file_paths):
         'serper_credits': total_serper_credits
     }
 
-def get_official_websites(file_company_list, main_company, log_file_paths):
+def get_official_websites(file_company_list, main_company, company_website, log_file_paths):
     sample_expert_website_researcher_output = {
         'subdisiary_name1': [
             'https://www.subdisiary_name1.com',
@@ -413,6 +407,7 @@ def get_official_websites(file_company_list, main_company, log_file_paths):
     total_website_researcher_serper_credits = 0
 
     data = []
+    company_website_exists = False
     for result in final_results:
         if isinstance(result, dict):
             if 'websites' in result and 'llm_usage' in result:
@@ -422,16 +417,26 @@ def get_official_websites(file_company_list, main_company, log_file_paths):
                 total_website_researcher_prompt_tokens += llm_usage['prompt_tokens']
                 total_website_researcher_completion_tokens += llm_usage['completion_tokens']
                 total_website_researcher_serper_credits += result['serper_credits']
-                
-                for company, urls in websites.items():
-                    for url in urls:
-                        data.append({'Company Name': company, 'Website URL': url})
+
+                if isinstance(websites, dict):
+                    for company, urls in websites.items():
+                        for url in urls:
+                            if extract_domain_name(url) == extract_domain_name(company_website):
+                                company_website_exists = True
+                            data.append({'Company Name': company, 'Website URL': url})
+                else:
+                    with open(log_file_paths['log'], 'a') as f:
+                        f.write(f"Skipping result with non-dict 'websites' key: {result}")
             else:
                 with open(log_file_paths['log'], 'a') as f:
                     f.write(f"Skipping result with missing 'websites' or 'llm_usage' key: {result}")
         else:
             with open(log_file_paths['log'], 'a') as f:
                 f.write(f"Skipping non-dict result from expert website researcher: {result}")
+
+    if company_website_exists is False:
+        data.append({'Company Name': main_company, 'Website URL': company_website})
+    
     return {
         'data': data,
         'llm_usage': {
